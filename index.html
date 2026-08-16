@@ -11,21 +11,21 @@
 </head>
 <body>
 <div id="boot">Loading rota…</div>
-<script src="./patches.js?v=20260816-2226"></script>
-<script src="./contract-topup.js?v=20260816-2226"></script>
-<script src="./contract-cap.js?v=20260816-2226"></script>
-<script src="./off-plan.js?v=20260816-2226"></script>
-<script src="./availability-guard.js?v=20260816-2226"></script>
-<script src="./wlb-optimizer.js?v=20260816-2226"></script>
-<script src="./balanced-template.js?v=20260816-2226"></script>
-<script src="./fran-friday.js?v=20260816-2226"></script>
-<script src="./saturday-foh.js?v=20260816-2226"></script>
-<script src="./bar-floor-guard.js?v=20260816-2226"></script>
-<script src="./clean-shift-labels.js?v=20260816-2226"></script>
+<script src="./patches.js?v=20260817-0000"></script>
+<script src="./contract-topup.js?v=20260817-0000"></script>
+<script src="./contract-cap.js?v=20260817-0000"></script>
+<script src="./off-plan.js?v=20260817-0000"></script>
+<script src="./availability-guard.js?v=20260817-0000"></script>
+<script src="./wlb-optimizer.js?v=20260817-0000"></script>
+<script src="./balanced-template.js?v=20260817-0000"></script>
+<script src="./fran-friday.js?v=20260817-0000"></script>
+<script src="./saturday-foh.js?v=20260817-0000"></script>
+<script src="./bar-floor-guard.js?v=20260817-0000"></script>
+<script src="./clean-shift-labels.js?v=20260817-0000"></script>
 <script>
 (async function () {
   try {
-    const response = await fetch('./app-original.html?v=20260816-2226', { cache: 'no-store' });
+    const response = await fetch('./app-original.html?v=20260817-0000', { cache: 'no-store' });
     if (!response.ok) throw new Error('Could not load rota app');
     let html = await response.text();
     if (typeof window.applyCookfellasPatches !== 'function') throw new Error('Rota patches failed to load');
@@ -56,7 +56,7 @@
     if (typeof window.applyCleanShiftLabelsPatch === 'function') {
       html = window.applyCleanShiftLabelsPatch(html);
     }
-    html = html.replace('</body>', '<div style="position:fixed;right:8px;bottom:6px;z-index:9999;font:10px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#6B776E;background:#16211BCC;padding:2px 5px;border-radius:4px;pointer-events:none">Build 22:26-sat4foh</div></body>');
+    html = html.replace('</body>', '<div style="position:fixed;right:8px;bottom:6px;z-index:9999;font:10px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#6B776E;background:#16211BCC;padding:2px 5px;border-radius:4px;pointer-events:none">Build 00:00-sat-afternoon</div></body>');
     document.open();
     document.write(html);
     document.close();
