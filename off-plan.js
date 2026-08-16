@@ -12,14 +12,19 @@ window.applyContractOffPlanPatch = function (html) {
     };
     for(let s of e){
       if(s.contractType!=="contracted"||skip.has(s.id))continue;
-      let daily={};
+      let daily={},state={};
       for(let day of m){
         CtOffPlan.day=day;
-        daily[day]=Math.max(bestBoard(s,t,!0),bestBoard(s,a,!1))
+        daily[day]=Math.max(bestBoard(s,t,!0),bestBoard(s,a,!1));
+        state[day]=Ve(s,day)
       }
       let target=s.contractedHours*60,best=null;
       for(let i=0;i<m.length;i++){
-        let block=[m[i],m[(i+1)%m.length]],potential=m.filter(d=>!block.includes(d)).reduce((z,d)=>z+daily[d],0),short=Math.max(0,target-potential),lost=daily[block[0]]+daily[block[1]],score=short*100000+lost;
+        let block=[m[i],m[(i+1)%m.length]],potential=m.filter(d=>!block.includes(d)).reduce((z,d)=>z+daily[d],0),short=Math.max(0,target-potential),lost=daily[block[0]]+daily[block[1]],
+            partialPenalty=block.reduce((z,d)=>z+(state[d]==="am"||state[d]==="pm"?1:0),0),
+            fullPenalty=block.reduce((z,d)=>z+(state[d]==="full"?1:0),0),
+            noneBonus=block.reduce((z,d)=>z+(state[d]==="none"?1:0),0),
+            score=short*1000000+partialPenalty*100000+fullPenalty*1000+lost-noneBonus*5000;
         if(!best||score<best.score)best={score,block}
       }
       if(best)out[s.id]=new Set(best.block)
