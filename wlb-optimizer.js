@@ -20,7 +20,7 @@ window.applyWlbOptimizerPatch = function (html) {
           assigned=id=>w.filter(q=>j(q)===id),
           days=id=>new Set(assigned(id).map(q=>q.slot.day)),
           mins=id=>assigned(id).reduce((z,q)=>z+W(q.slot.time)*60,0),
-          valid=(s,q)=>!!s&&Q(s,q.slot.day,q.slot.time)&&(q.board!=="r"||D(s.level)>=D(q.slot.role)),
+          valid=(s,q)=>!!s&&Q(s,q.slot.day,q.slot.time)&&(q.board==="b"?D(s.level)>=D("floor"):D(s.level)>=D(q.slot.role)),
           room=(s,q,ignoreCap=!1)=>{if(!valid(s,q))return!1;if(assigned(s.id).some(r=>overlap(r,q)))return!1;if(!ignoreCap&&s.contractType==="contracted"&&mins(s.id)+W(q.slot.time)*60>s.contractedHours*60+h*60+.01)return!1;return!0},
           twoOffAfter=(id,day)=>{let z=days(id);z.add(day);for(let k=0;k<m.length;k++){let u=m[k],v=m[(k+1)%m.length];if(!z.has(u)&&!z.has(v))return!0}return!1},
           find=(board,day,time,role=null)=>w.find(q=>q.board===board&&q.slot.day===day&&q.slot.time===time&&(!role||q.slot.role===role))||w.find(q=>q.board===board&&q.slot.day===day&&q.slot.time.startsWith(time)&&(!role||q.slot.role===role)),
