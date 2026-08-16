@@ -12,6 +12,7 @@
 <body>
 <div id="boot">Loading rota…</div>
 <script src="./patches.js?v=20260816-1554"></script>
+<script src="./contract-topup.js?v=20260816-1558"></script>
 <script>
 (async function () {
   try {
@@ -19,7 +20,9 @@
     if (!response.ok) throw new Error('Could not load rota app');
     let html = await response.text();
     if (typeof window.applyCookfellasPatches !== 'function') throw new Error('Rota patches failed to load');
+    if (typeof window.applyContractTopupPatch !== 'function') throw new Error('Contract top-up patch failed to load');
     html = window.applyCookfellasPatches(html);
+    html = window.applyContractTopupPatch(html);
     document.open();
     document.write(html);
     document.close();
