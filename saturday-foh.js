@@ -15,7 +15,20 @@ window.applySaturdayFohPatch = function (html) {
     if (html.includes(oldSaturday)) {
       html = html.replace(oldSaturday, newSaturday);
     } else {
-      console.warn('Saturday split-cover WLB marker not found; leaving Saturday template unchanged.');
+      console.warn('Saturday split-cover WLB marker not found; leaving Saturday Restaurant template unchanged.');
+    }
+
+    // Saturday Bar coverage:
+    // 1 person at lunch, 2 through the afternoon, 3 from 5pm to finish.
+    // Tyler remains anchored to one 2-f slot; the second 2-f and the 5-f
+    // closing slot are filled independently by other floor-trained staff.
+    const oldSaturdayBar = '{"day":"Sat","role":"bar","time":"11:30-2:30","isOpen":true},{"day":"Sat","role":"bar","time":"2-f"},{"day":"Sat","role":"bar","time":"5-f (closedown)","isClose":true},{"day":"Sun"';
+    const newSaturdayBar = '{"day":"Sat","role":"bar","time":"11:30-2:30","isOpen":true},{"day":"Sat","role":"bar","time":"2-f"},{"day":"Sat","role":"bar","time":"2-f"},{"day":"Sat","role":"bar","time":"5-f (closedown)","isClose":true},{"day":"Sun"';
+
+    if (html.includes(oldSaturdayBar)) {
+      html = html.replace(oldSaturdayBar, newSaturdayBar);
+    } else {
+      console.warn('Saturday Bar coverage marker not found; leaving Saturday Bar template unchanged.');
     }
 
     // The base scheduler may already have put the same person on the new
@@ -39,7 +52,7 @@ window.applySaturdayFohPatch = function (html) {
 
     return html;
   } catch (error) {
-    console.error('Saturday split-cover WLB patch skipped:', error);
+    console.error('Saturday coverage patch skipped:', error);
     return html;
   }
 };
