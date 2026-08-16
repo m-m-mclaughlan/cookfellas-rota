@@ -11,15 +11,16 @@
 </head>
 <body>
 <div id="boot">Loading rota…</div>
-<script src="./patches.js?v=20260816-2059"></script>
-<script src="./contract-topup.js?v=20260816-2059"></script>
-<script src="./contract-cap.js?v=20260816-2059"></script>
-<script src="./off-plan.js?v=20260816-2059"></script>
-<script src="./availability-guard.js?v=20260816-2059"></script>
+<script src="./patches.js?v=20260816-2100"></script>
+<script src="./contract-topup.js?v=20260816-2100"></script>
+<script src="./contract-cap.js?v=20260816-2100"></script>
+<script src="./off-plan.js?v=20260816-2100"></script>
+<script src="./availability-guard.js?v=20260816-2100"></script>
+<script src="./balanced-template.js?v=20260816-2100"></script>
 <script>
 (async function () {
   try {
-    const response = await fetch('./app-original.html?v=20260816-2059', { cache: 'no-store' });
+    const response = await fetch('./app-original.html?v=20260816-2100', { cache: 'no-store' });
     if (!response.ok) throw new Error('Could not load rota app');
     let html = await response.text();
     if (typeof window.applyCookfellasPatches !== 'function') throw new Error('Rota patches failed to load');
@@ -32,7 +33,10 @@
     html = window.applyContractCapPatch(html);
     html = window.applyContractOffPlanPatch(html);
     html = window.applyAvailabilityGuardPatch(html);
-    html = html.replace('</body>', '<div style="position:fixed;right:8px;bottom:6px;z-index:9999;font:10px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#6B776E;background:#16211BCC;padding:2px 5px;border-radius:4px;pointer-events:none">Build 20:59-restored</div></body>');
+    if (typeof window.applyBalancedTemplatePatch === 'function') {
+      html = window.applyBalancedTemplatePatch(html);
+    }
+    html = html.replace('</body>', '<div style="position:fixed;right:8px;bottom:6px;z-index:9999;font:10px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#6B776E;background:#16211BCC;padding:2px 5px;border-radius:4px;pointer-events:none">Build 21:00-wlb-safe</div></body>');
     document.open();
     document.write(html);
     document.close();
