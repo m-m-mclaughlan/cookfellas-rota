@@ -1,23 +1,25 @@
 window.applySaturdayFohPatch = function (html) {
   try {
-    // WLB Saturday evening mirrors Friday headcount:
-    // 4 customer-facing FOH from 5-9, then 3 FOH to finish.
+    // Saturday Restaurant coverage:
+    // 2 customer-facing FOH continuously from 12-5,
+    // 4 customer-facing FOH from 5-9,
+    // 3 customer-facing FOH from 9-finish.
     // Potwash is separate.
-    // One of the non-manager floor shifts now starts at 2pm rather than 5pm
-    // to remove the Saturday afternoon blind spot while preserving the
-    // evening headcount and the dedicated 5pm runner.
-    const oldSaturday = '{"day":"Sat","role":"running","time":"5-f"},{"day":"Sat","role":"floor","time":"5-f (closedown)","isClose":true},{"day":"Sun"';
-    const newSaturday = '{"day":"Sat","role":"running","time":"5-f"},{"day":"Sat","role":"floor","time":"5-f (closedown)","isClose":true},{"day":"Sat","role":"floor","time":"2-f"},{"day":"Sun"';
+    // Merge the old 12-2:30 support shift and extra 2-f floor shift into
+    // one continuous 12-f floor shift, avoiding both the noon blind spot
+    // and unnecessary overlapping labour.
+    const oldSaturday = '{"day":"Sat","role":"floor","time":"11-9","isOpen":true},{"day":"Sat","role":"floor","time":"12-2:30"},{"day":"Sat","role":"pots","time":"11-5"},{"day":"Sat","role":"pots","time":"5-f"},{"day":"Sat","role":"running","time":"5-f"},{"day":"Sat","role":"floor","time":"5-f (closedown)","isClose":true},{"day":"Sun"';
+    const newSaturday = '{"day":"Sat","role":"floor","time":"11-9","isOpen":true},{"day":"Sat","role":"floor","time":"12-f"},{"day":"Sat","role":"pots","time":"11-5"},{"day":"Sat","role":"pots","time":"5-f"},{"day":"Sat","role":"running","time":"5-f"},{"day":"Sat","role":"floor","time":"5-f (closedown)","isClose":true},{"day":"Sun"';
 
     if (html.includes(oldSaturday)) {
       html = html.replace(oldSaturday, newSaturday);
     } else {
-      console.warn('Saturday afternoon-cover WLB marker not found; leaving Saturday template unchanged.');
+      console.warn('Saturday continuous-cover WLB marker not found; leaving Saturday template unchanged.');
     }
 
     return html;
   } catch (error) {
-    console.error('Saturday afternoon-cover WLB patch skipped:', error);
+    console.error('Saturday continuous-cover WLB patch skipped:', error);
     return html;
   }
 };
