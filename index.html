@@ -11,133 +11,15 @@
 </head>
 <body>
 <div id="boot">Loading rota…</div>
+<script src="./patches.js?v=20260816-1554"></script>
 <script>
 (async function () {
   try {
     const response = await fetch('./app-original.html', { cache: 'no-store' });
     if (!response.ok) throw new Error('Could not load rota app');
     let html = await response.text();
-
-    const availabilityPatch = `
-<style id="availability-split-vertical-fix">
-button[title*="available mornings only"] {
-  background: linear-gradient(to right, #C9A24B66 0%, #C9A24B66 50%, transparent 50%, transparent 100%) !important;
-}
-button[title*="available evenings only"] {
-  background: linear-gradient(to right, transparent 0%, transparent 50%, #C9A24B66 50%, #C9A24B66 100%) !important;
-}
-</style>`;
-    html = html.replace('</head>', availabilityPatch + '</head>');
-
-    // Use contracted staff up to their FULL contract before preferring
-    // zero-hours staff. Shortfall remains a warning/tolerance setting.
-    const contractPriorityMarker = 'X=r=>Math.max(0,r.contractedHours*60-me)';
-    if (!html.includes(contractPriorityMarker)) throw new Error('Contract priority marker not found');
-    html = html.replace(contractPriorityMarker, 'X=r=>Math.max(0,r.contractedHours*60)');
-
-    // Strict aligned days off means one shared block of TWO consecutive
-    // days off. It does NOT mean identical working days. Once that block
-    // is secured, each linked person is independently topped up toward
-    // their full contract on the remaining five days.
-    const strictAlignFn = `ArStrict=(e,t,n,a,l,c,h=2,d=2)=>{
-  let y={...n},x={...l};
-  if(!c)return{assignments:y,barAssignments:x};
-  let[A,T]=c,R=Object.fromEntries(e.map(s=>[s.id,s])),
-      w=[...t.map(s=>({slot:s,board:"r"})),...a.map(s=>({slot:s,board:"b"}))],
-      j=q=>q.board==="r"?y[q.slot.id]:x[q.slot.id],
-      M=(q,id)=>{if(q.board==="r"){id?y[q.slot.id]=id:delete y[q.slot.id]}else{id?x[q.slot.id]=id:delete x[q.slot.id]}},
-      O=id=>{let z=new Set;w.forEach(q=>{j(q)===id&&z.add(q.slot.day)});return z},
-      E=id=>w.reduce((z,q)=>j(q)===id?z+W(q.slot.time)*60:z,0),
-      Y=(id,day)=>O(id).has(day),
-      K=id=>R[id]?.contractType==="contracted"?R[id].contractedHours*60:Infinity,
-      L=id=>R[id]?.contractType==="contracted"?R[id].contractedHours*60+h*60:Infinity,
-      C=(day,flag,exclude)=>w.some(q=>q!==exclude&&q.slot.day===day&&q.slot[flag]&&R[j(q)]?.isManager),
-      H=(q,oldId,newId)=>{if(!oldId||!R[oldId]?.isManager||R[newId]?.isManager)return!1;return(q.slot.isOpen&&!C(q.slot.day,"isOpen",q))||(q.slot.isClose&&!C(q.slot.day,"isClose",q))},
-      F=(id,q)=>{let s=R[id];return !!s&&Q(s,q.slot.day,q.slot.time)&&(q.board!=="r"||D(s.level)>=D(q.slot.role))},
-      twoOffWith=(id,extraDay)=>{let z=O(id);extraDay&&z.add(extraDay);for(let k=0;k<m.length;k++){let u=m[k],v=m[(k+1)%m.length];if(!z.has(u)&&!z.has(v))return!0}return!1},
-      U=(id,q)=>{let cur=w.filter(r=>r.slot.day===q.slot.day&&j(r)===id);if(!cur.length)return!0;return cur.every(r=>r.board===q.board&&((r.slot.isOpen&&!r.slot.isClose&&q.slot.isClose&&!q.slot.isOpen)||(r.slot.isClose&&!r.slot.isOpen&&q.slot.isOpen&&!q.slot.isClose)))},
-      V=(id,q,locked)=>{let s=R[id];if(!F(id,q)||locked.has(q.slot.day)||!U(id,q))return!1;let ds=O(id),fresh=!ds.has(q.slot.day);if(fresh&&s.contractType==="zeroHours"&&s.wantedShiftsPerWeek!=null&&ds.size>=s.wantedShiftsPerWeek)return!1;if(fresh&&!twoOffWith(id,q.slot.day))return!1;return E(id)+W(q.slot.time)*60<=L(id)},
-      Z=(id,q)=>{let occ=j(q);if(occ===id||occ===A||occ===T)return!1;if(occ&&R[occ]?.contractType!=="zeroHours")return!1;if(occ&&H(q,occ,id))return!1;return!0},
-      B=(id,q)=>{let s=R[id],cur=E(id),target=K(id),mins=W(q.slot.time)*60,def=Number.isFinite(target)?Math.max(0,target-cur):0,use=Math.min(def,mins),over=Number.isFinite(target)?Math.max(0,cur+mins-target):0,area=q.board==="b"?(s.isBarStaff?-700:700):(s.isBarStaff?700:-700),replace=j(q)?120:0;return-use*100+over*8+area+replace},
-      Qc=id=>R[id]?.contractType==="contracted"&&E(id)<K(id)-.01;
-
-  // Pick the shared consecutive off block. Prefer one they already share;
-  // otherwise choose the block requiring the least disruption.
-  let blocks=m.map((day,k)=>[day,m[(k+1)%m.length]]),
-      existing=blocks.filter(([u,v])=>!Y(A,u)&&!Y(A,v)&&!Y(T,u)&&!Y(T,v)),
-      disruption=block=>w.reduce((z,q)=>(block.includes(q.slot.day)&&(j(q)===A||j(q)===T))?z+W(q.slot.time)*60:z,0),
-      chosen=(existing.length?existing:blocks.slice().sort((p,q)=>disruption(p)-disruption(q)))[0],
-      locked=new Set(chosen);
-
-  // Clear linked staff from the locked two days, then refill those shifts
-  // with other eligible staff where possible.
-  let removed=w.filter(q=>locked.has(q.slot.day)&&(j(q)===A||j(q)===T));
-  removed.forEach(q=>M(q,null));
-  for(let q of removed){
-    let needMgr=(q.slot.isOpen&&!C(q.slot.day,"isOpen",null))||(q.slot.isClose&&!C(q.slot.day,"isClose",null));
-    let candidates=e.filter(s=>s.id!==A&&s.id!==T&&V(s.id,q,new Set)&&(!needMgr||s.isManager))
-      .sort((s1,s2)=>B(s1.id,q)-B(s2.id,q));
-    if(candidates.length)M(q,candidates[0].id)
-  }
-
-  // Generate valid work bundles outside the shared off block. A bundle is
-  // one shift, or an opening+closing split on the same board.
-  let bundles=(id,day)=>{
-    if(locked.has(day))return[];
-    let s=R[id],already=Y(id,day),base=w.filter(q=>q.slot.day===day&&Z(id,q)&&F(id,q)),out=[];
-    if(already){
-      for(let q of base)if(V(id,q,locked))out.push([q])
-    }else{
-      let ds=O(id);
-      if(s.contractType==="zeroHours"&&s.wantedShiftsPerWeek!=null&&ds.size>=s.wantedShiftsPerWeek)return[];
-      for(let q of base){let mins=W(q.slot.time)*60;if(E(id)+mins<=L(id))out.push([q])}
-      for(let q1 of base)for(let q2 of base){
-        if(q1===q2||q1.board!==q2.board)continue;
-        if(!(q1.slot.isOpen&&!q1.slot.isClose&&q2.slot.isClose&&!q2.slot.isOpen))continue;
-        let mins=(W(q1.slot.time)+W(q2.slot.time))*60;
-        if(E(id)+mins<=L(id))out.push([q1,q2])
-      }
-    }
-    let seen=new Set;
-    return out.filter(b=>{let key=b.map(q=>q.board+":"+q.slot.id).sort().join("|");if(seen.has(key))return!1;seen.add(key);return!0})
-  },
-  bundleScore=(id,b)=>{let s=R[id],cur=E(id),target=K(id),mins=b.reduce((z,q)=>z+W(q.slot.time)*60,0),def=Number.isFinite(target)?Math.max(0,target-cur):0,use=Math.min(def,mins),over=Number.isFinite(target)?Math.max(0,cur+mins-target):mins,area=b.reduce((z,q)=>z+(q.board==="b"?(s.isBarStaff?-700:700):(s.isBarStaff?700:-700)),0),replace=b.filter(q=>j(q)).length*120;return-use*100+over*8+area+replace};
-
-  // Independently top up each linked contracted employee toward FULL
-  // contract. This is the key distinction: Fran may have an extra day off
-  // while Tyler works, provided they retain the same locked two-day block.
-  for(let id of[A,T]){
-    for(let pass=0;pass<12&&Qc(id);pass++){
-      let best=null;
-      for(let day of m){
-        for(let b of bundles(id,day)){
-          let score=bundleScore(id,b);
-          if(!best||score<best.score)best={score,b}
-        }
-      }
-      if(!best||best.score>=0)break;
-      best.b.forEach(q=>M(q,id))
-    }
-  }
-
-  return{assignments:y,barAssignments:x}
-}`;
-    const schedulerMarker = '},xe=(e,t,{maxOvertimeHours';
-    if (!html.includes(schedulerMarker)) throw new Error('Scheduler marker not found');
-    html = html.replace(schedulerMarker, '},' + strictAlignFn + ',xe=(e,t,{maxOvertimeHours');
-
-    const alignedA = 'return{...e,assignments:a.assignments,bar:{...e.bar,assignments:a.barAssignments}}';
-    const alignedAReplacement = 'let __aligned=ArStrict(e.staff,e.slots,a.assignments,e.bar.slots,a.barAssignments,We(e.staff,e.linkedDaysOff),e.maxOvertimeHours??2,e.allowedShortfallHours??2);return{...e,assignments:__aligned.assignments,bar:{...e.bar,assignments:__aligned.barAssignments}}';
-    if (!html.includes(alignedA)) throw new Error('Combined assignment marker A not found');
-    html = html.split(alignedA).join(alignedAReplacement);
-
-    const alignedC = 'return{...e,assignments:c.assignments,bar:{...e.bar,assignments:c.barAssignments}}';
-    const alignedCReplacement = 'let __aligned=ArStrict(e.staff,e.slots,c.assignments,e.bar.slots,c.barAssignments,We(e.staff,e.linkedDaysOff),e.maxOvertimeHours??2,e.allowedShortfallHours??2);return{...e,assignments:__aligned.assignments,bar:{...e.bar,assignments:__aligned.barAssignments}}';
-    if (!html.includes(alignedC)) throw new Error('Combined assignment marker C not found');
-    html = html.replace(alignedC, alignedCReplacement);
-
-    html = html.replace('"Aligned days off"', '"Aligned days off · strict 2-day block"');
-
+    if (typeof window.applyCookfellasPatches !== 'function') throw new Error('Rota patches failed to load');
+    html = window.applyCookfellasPatches(html);
     document.open();
     document.write(html);
     document.close();
