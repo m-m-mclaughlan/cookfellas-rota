@@ -14,6 +14,7 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const readState=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch{return null}};
   const clone=x=>JSON.parse(JSON.stringify(x));
+  const potsSegment=(day,t)=>day==='Sat'?(t<17*60?'sat-11-5':'sat-5-close'):'whole';
 
   function availabilityOk(staff,position){
     const v=staff.availableDays?.[position.day]||'full';
@@ -87,7 +88,13 @@
           const a=toMin(r.start),b=toMin(r.end);
           if(a!=null&&b!=null&&a<=t&&b>=t+30)need=Math.max(need,Number(r.count)||0);
         }
-        for(let slot=0;slot<need;slot++)positions.push({day,area,role,start:t,end:t+30,slot});
+        for(let slot=0;slot<need;slot++){
+          const segment=role==='pots'?potsSegment(day,t):null;
+          positions.push({
+            day,area,role,start:t,end:t+30,slot,
+            potsLockKey:role==='pots'?`${area}|${segment}|${slot}`:null
+          });
+        }
       }
     }
     return positions;
@@ -102,35 +109,35 @@
     for(let t=open;t<close;t+=30){
       for(const p of positionsForBlock(state,day,t)){
         if(p.role!=='pots')continue;
-        if(!requirements.has(p.slot))requirements.set(p.slot,[]);
-        requirements.get(p.slot).push(p);
+        if(!requirements.has(p.potsLockKey))requirements.set(p.potsLockKey,[]);
+        requirements.get(p.potsLockKey).push(p);
       }
     }
     if(!requirements.size)return [new Map()];
 
     const staff=state.staff||[];
-    const slots=[...requirements.keys()].sort((a,b)=>a-b);
+    const lockKeys=[...requirements.keys()].sort();
     const candidates=new Map();
-    for(const slot of slots){
-      const reqs=requirements.get(slot);
+    for(const lockKey of lockKeys){
+      const reqs=requirements.get(lockKey);
       const eligible=staff.filter(s=>
         !isOff(offMap,s,day)&&reqs.every(p=>availabilityOk(s,p)&&skillOk(s,p))
       );
       if(!eligible.length)return [];
-      candidates.set(slot,eligible);
+      candidates.set(lockKey,eligible);
     }
 
     const out=[];
     const used=new Set();
     const locks=new Map();
     function dfs(i){
-      if(i===slots.length){out.push(new Map(locks));return}
-      const slot=slots[i];
-      for(const s of candidates.get(slot)){
+      if(i===lockKeys.length){out.push(new Map(locks));return}
+      const lockKey=lockKeys[i];
+      for(const s of candidates.get(lockKey)){
         if(used.has(s.id))continue;
-        used.add(s.id);locks.set(slot,s.id);
+        used.add(s.id);locks.set(lockKey,s.id);
         dfs(i+1);
-        locks.delete(slot);used.delete(s.id);
+        locks.delete(lockKey);used.delete(s.id);
       }
     }
     dfs(0);
@@ -149,7 +156,7 @@
       p,
       eligible:staff.filter(s=>{
         if(isOff(offMap,s,day)||!availabilityOk(s,p)||!skillOk(s,p))return false;
-        if(p.role==='pots'&&potsLocks.has(p.slot)&&s.id!==potsLocks.get(p.slot))return false;
+        if(p.role==='pots'&&potsLocks.has(p.potsLockKey)&&s.id!==potsLocks.get(p.potsLockKey))return false;
         return true;
       })
     })).sort((a,b)=>a.eligible.length-b.eligible.length);
@@ -205,9 +212,6 @@
     for(const s of group.members)offMap.delete(s.id);
   }
 
-  // Pressure is only a search-order heuristic. It steers days off away from
-  // blocks that are already close to their staffing/manager limits, while the
-  // exact feasibility checker above remains the hard test.
   function pairPressure(state,offMap,pair){
     const staff=state.staff||[];
     let pressure=0;
@@ -304,9 +308,9 @@
     const panel=document.getElementById('resultsPanel');
     if(!panel)return;
     panel.style.display='block';
-    document.getElementById('resultHint').textContent='No rota published. A complete consecutive-days-off search could not find a schedule-compatible set of off-day pairs, including whole-shift pots cover.';
+    document.getElementById('resultHint').textContent='No rota published. A complete consecutive-days-off search could not find a schedule-compatible set of off-day pairs, including whole-shift pots cover and the two-person Saturday pots split.';
     document.getElementById('metrics').innerHTML='<div class="metric"><div class="k">Rota status</div><div class="v">INVALID</div></div>';
-    document.getElementById('warnings').innerHTML='<div class="warn"><strong>Two-days-off failure:</strong> Every possible pair was searched under the current coverage, skills, availability, whole-shift pots and manager rules. Fran and Tyler must also share the same pair.</div>';
+    document.getElementById('warnings').innerHTML='<div class="warn"><strong>Two-days-off failure:</strong> Every possible pair was searched under the current coverage, skills, availability, whole-shift pots and manager rules. Saturday pots requires different people for 11–5 and 5–close. Fran and Tyler must also share the same pair.</div>';
     document.getElementById('rotaGrid').innerHTML='';
     panel.scrollIntoView({behavior:'smooth',block:'start'});
   }
