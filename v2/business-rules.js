@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const KEY='cookfellas-smart-v2-config';
-  const VERSION=4;
+  const VERSION=5;
   const NOON='12:00';
   const STARTS={Mon:'11:30',Tue:'11:30',Wed:'11:30',Thu:'11:30',Fri:'11:30',Sat:'11:00',Sun:'11:00'};
 
@@ -15,20 +15,28 @@
     const source=rows||[];
     const out=[];
 
-    // Re-use the existing canonical opening-row ID where possible. This is
-    // important: creating a new ID on every pass made migrate() report a
-    // change forever, which intercepted Generate and caused a reload loop.
+    // The hard opening rule applies to customer-facing FOH only:
+    // exactly one Restaurant floor opener and one Bar FOH opener before noon.
+    // Other Restaurant roles (for example pots) are preserved exactly as
+    // entered, so they may start before noon when the business needs them.
     const existingOpening=source.find(r=>
       r.role===primaryRole&&r.start===start&&r.end===NOON&&Number(r.count)===1
     );
 
-    // Before noon there is exactly one setup/opening person in each area.
-    // Any other requirement begins no earlier than 12:00. Post-noon counts
-    // are preserved exactly as the user entered them.
     for(const r0 of source){
       const r={...r0};
       const a=mins(r.start),b=mins(r.end);
+
+      // Non-primary Restaurant roles such as pots/running are user-controlled.
+      if(area==='restaurant'&&r.role!==primaryRole){
+        out.push(r);
+        continue;
+      }
+
       if(a==null||b==null||b<=a){out.push(r);continue}
+
+      // Remove any competing primary-role requirement that sits wholly before
+      // noon. If it crosses noon, preserve its post-noon demand only.
       if(b<=noon)continue;
       if(a<noon)r.start=NOON;
       out.push(r)
@@ -63,8 +71,8 @@
   }
 
   function reloadAfterMigration(){
-    if(migrate()&&sessionStorage.getItem('cookfellas-v2-opening-v4')!=='1'){
-      sessionStorage.setItem('cookfellas-v2-opening-v4','1');
+    if(migrate()&&sessionStorage.getItem('cookfellas-v2-opening-v5')!=='1'){
+      sessionStorage.setItem('cookfellas-v2-opening-v5','1');
       location.reload();
       return true
     }
@@ -80,30 +88,27 @@
   }
   const coverageHint=document.querySelector('.panel .hint');
   if(coverageHint&&!document.getElementById('openingRuleNote')){
-    coverageHint.insertAdjacentHTML('afterend','<div id="openingRuleNote" class="ok" style="margin-top:-4px">Opening rule: 1 person in Restaurant + 1 person in Bar before 12:00. Staffing starts 11:30 Mon–Fri, 11:00 Sat–Sun.</div>');
+    coverageHint.insertAdjacentHTML('afterend','<div id="openingRuleNote" class="ok" style="margin-top:-4px">Opening rule: 1 Restaurant FOH opener + 1 Bar FOH opener before 12:00. Other roles such as pots can start earlier if required. Staffing starts 11:30 Mon–Fri, 11:00 Sat–Sun.</div>');
   }
 
-  // Reset Coverage recreates the starter defaults. Re-normalise immediately
-  // afterwards so the fixed business opening rule remains intact.
   const reset=document.getElementById('resetCoverage');
   if(reset){
     reset.addEventListener('click',()=>{
       setTimeout(()=>{
-        sessionStorage.removeItem('cookfellas-v2-opening-v4');
+        sessionStorage.removeItem('cookfellas-v2-opening-v5');
         if(migrate())location.reload();
       },0)
     });
   }
 
-  // If a pre-noon requirement is manually edited later, enforce the hard
-  // opening rule once before generation. With the canonical ID preserved,
-  // a normal Generate click now passes straight through without reloading.
+  // Enforce only the fixed FOH opening rule before generation. User-entered
+  // non-primary requirements are now left untouched and therefore persist.
   const generate=document.getElementById('generate');
   if(generate){
     generate.addEventListener('click',e=>{
       if(migrate()){
         e.stopImmediatePropagation();
-        sessionStorage.removeItem('cookfellas-v2-opening-v4');
+        sessionStorage.removeItem('cookfellas-v2-opening-v5');
         location.reload();
       }
     },true)
