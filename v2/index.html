@@ -15,7 +15,7 @@
     <div>
       <div class="eyebrow">Cookfella's Bar &amp; Eatery · V2</div>
       <div class="title">Smart Rota</div>
-      <div class="sub">Core rebuild. Coverage, skills, manager opening/closing cover, roster availability and balanced contracted-hour targets are active. Other roster settings remain editable but inactive.</div>
+      <div class="sub">Core rebuild. Coverage, skills, manager opening/closing cover, roster availability, consecutive days off and balanced contracted-hour targets are active. Other roster settings remain editable but inactive.</div>
     </div>
     <div class="actions">
       <button class="btn" id="importLegacy">Import current V2 roster</button>
@@ -42,7 +42,7 @@
 
     <section class="panel">
       <h2>Staff roster</h2>
-      <p class="hint"><strong>Active now:</strong> skill level, manager status, contract type/hours and availability. Availability buttons are hard rules: Full = all day, AM = until 5pm, PM = from 5pm, None = unavailable. <strong>Stored but inactive:</strong> Bar preference, preferred minimum shift, max workdays and wanted days.</p>
+      <p class="hint"><strong>Active now:</strong> skill level, manager status, contract type/hours, availability and a mandatory pair of consecutive days off. Fran &amp; Tyler are hard-linked to the same two days off. Sunday + Monday counts as a consecutive pair. <strong>Stored but inactive:</strong> Bar preference, preferred minimum shift, max workdays and wanted days.</p>
       <div class="actions" style="margin-bottom:9px"><button class="btn small" id="addStaff">+ Staff</button><span class="badge" id="staffSource"></span></div>
       <div class="staffList" id="staffList"></div>
     </section>
@@ -54,13 +54,14 @@
     <div class="metrics" id="metrics"></div>
     <div id="warnings"></div>
     <div class="rotaGrid" id="rotaGrid"></div>
-    <div class="footerNote">V2 Core 0.8 keeps full coverage, skills, roster availability and manager opening/closing cover hard. Contracted targets are balanced inside those hard constraints. Mon–Thu closing FOH demand is one floor-trained person in each area from 9pm. Workday limits, split rules, shift-length preferences and Bar preference remain inactive.</div>
+    <div class="footerNote">V2 Core 0.9 keeps full coverage, skills, roster availability, manager opening/closing cover and one mandatory consecutive off-day pair per staff member hard. Fran and Tyler share the same pair. Contracted targets are balanced inside those hard constraints. Workday limits, split rules, shift-length preferences and Bar preference remain inactive.</div>
   </section>
 </div>
-<div class="build">V2 · Core 0.8</div>
+<div class="build">V2 · Core 0.9</div>
 <script src="./smart.js?v=20260817-1006"></script>
 <script src="./weekday-close-coverage.js?v=20260817-1302"></script>
 <script src="./export-fix.js?v=20260817-1048"></script>
 <script src="./baseline-optimizer.js?v=20260817-1332"></script>
+<script src="./two-days-off.js?v=20260817-1338"></script>
 </body>
 </html>
