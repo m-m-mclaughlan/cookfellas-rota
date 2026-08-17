@@ -87,13 +87,57 @@
           const a=toMin(r.start),b=toMin(r.end);
           if(a!=null&&b!=null&&a<=t&&b>=t+30)need=Math.max(need,Number(r.count)||0);
         }
-        for(let i=0;i<need;i++)positions.push({day,area,role,start:t,end:t+30});
+        for(let slot=0;slot<need;slot++)positions.push({day,area,role,start:t,end:t+30,slot});
       }
     }
     return positions;
   }
 
-  function blockFeasible(state,offMap,day,t){
+  function potsLockOptionsForDay(state,offMap,day){
+    const site=state.siteHours?.[day];
+    const open=toMin(site?.open),close=toMin(site?.close);
+    if(open==null||close==null||close<=open)return [new Map()];
+
+    const requirements=new Map();
+    for(let t=open;t<close;t+=30){
+      for(const p of positionsForBlock(state,day,t)){
+        if(p.role!=='pots')continue;
+        if(!requirements.has(p.slot))requirements.set(p.slot,[]);
+        requirements.get(p.slot).push(p);
+      }
+    }
+    if(!requirements.size)return [new Map()];
+
+    const staff=state.staff||[];
+    const slots=[...requirements.keys()].sort((a,b)=>a-b);
+    const candidates=new Map();
+    for(const slot of slots){
+      const reqs=requirements.get(slot);
+      const eligible=staff.filter(s=>
+        !isOff(offMap,s,day)&&reqs.every(p=>availabilityOk(s,p)&&skillOk(s,p))
+      );
+      if(!eligible.length)return [];
+      candidates.set(slot,eligible);
+    }
+
+    const out=[];
+    const used=new Set();
+    const locks=new Map();
+    function dfs(i){
+      if(i===slots.length){out.push(new Map(locks));return}
+      const slot=slots[i];
+      for(const s of candidates.get(slot)){
+        if(used.has(s.id))continue;
+        used.add(s.id);locks.set(slot,s.id);
+        dfs(i+1);
+        locks.delete(slot);used.delete(s.id);
+      }
+    }
+    dfs(0);
+    return out;
+  }
+
+  function blockFeasible(state,offMap,day,t,potsLocks=new Map()){
     const staff=state.staff||[];
     const positions=positionsForBlock(state,day,t);
     if(!positions.length)return true;
@@ -103,7 +147,11 @@
 
     const enriched=positions.map(p=>({
       p,
-      eligible:staff.filter(s=>!isOff(offMap,s,day)&&availabilityOk(s,p)&&skillOk(s,p))
+      eligible:staff.filter(s=>{
+        if(isOff(offMap,s,day)||!availabilityOk(s,p)||!skillOk(s,p))return false;
+        if(p.role==='pots'&&potsLocks.has(p.slot)&&s.id!==potsLocks.get(p.slot))return false;
+        return true;
+      })
     })).sort((a,b)=>a.eligible.length-b.eligible.length);
     if(enriched.some(x=>x.eligible.length===0))return false;
 
@@ -122,15 +170,26 @@
     return dfs(0,false);
   }
 
-  function daysFeasible(state,offMap,days){
-    for(const day of days){
-      const site=state.siteHours?.[day];
-      const open=toMin(site?.open),close=toMin(site?.close);
-      if(open==null||close==null||close<=open)continue;
+  function dayFeasible(state,offMap,day){
+    const site=state.siteHours?.[day];
+    const open=toMin(site?.open),close=toMin(site?.close);
+    if(open==null||close==null||close<=open)return true;
+
+    const potOptions=potsLockOptionsForDay(state,offMap,day);
+    if(!potOptions.length)return false;
+
+    for(const potsLocks of potOptions){
+      let ok=true;
       for(let t=open;t<close;t+=30){
-        if(!blockFeasible(state,offMap,day,t))return false;
+        if(!blockFeasible(state,offMap,day,t,potsLocks)){ok=false;break}
       }
+      if(ok)return true;
     }
+    return false;
+  }
+
+  function daysFeasible(state,offMap,days){
+    for(const day of days)if(!dayFeasible(state,offMap,day))return false;
     return true;
   }
 
@@ -205,9 +264,6 @@
       const key=snapshotKey(remaining);
       if(memo.has(key))return null;
 
-      // Minimum-remaining-values: choose whichever staff/group currently has
-      // the fewest viable consecutive-day pairs. This prevents the previous
-      // beam-search false negatives caused by committing to cheap pairs early.
       let selected=null,selectedOptions=null;
       for(const group of remaining){
         const options=domainFor(group);
@@ -248,9 +304,9 @@
     const panel=document.getElementById('resultsPanel');
     if(!panel)return;
     panel.style.display='block';
-    document.getElementById('resultHint').textContent='No rota published. A complete consecutive-days-off search could not find a schedule-compatible set of off-day pairs.';
+    document.getElementById('resultHint').textContent='No rota published. A complete consecutive-days-off search could not find a schedule-compatible set of off-day pairs, including whole-shift pots cover.';
     document.getElementById('metrics').innerHTML='<div class="metric"><div class="k">Rota status</div><div class="v">INVALID</div></div>';
-    document.getElementById('warnings').innerHTML='<div class="warn"><strong>Two-days-off failure:</strong> Every possible pair was searched under the current coverage, skills, availability and manager rules. Fran and Tyler must also share the same pair.</div>';
+    document.getElementById('warnings').innerHTML='<div class="warn"><strong>Two-days-off failure:</strong> Every possible pair was searched under the current coverage, skills, availability, whole-shift pots and manager rules. Fran and Tyler must also share the same pair.</div>';
     document.getElementById('rotaGrid').innerHTML='';
     panel.scrollIntoView({behavior:'smooth',block:'start'});
   }
