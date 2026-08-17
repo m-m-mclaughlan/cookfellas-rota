@@ -34,6 +34,8 @@
 
         let name = child.querySelector('.who')?.textContent?.trim() || 'UNFILLED';
         const time = child.querySelector('.time')?.textContent?.trim() || '';
+        const rawRole = child.querySelector('.role')?.textContent?.trim().toLowerCase() || '';
+        const role = area === 'restaurant' ? rawRole : 'bar';
         if (!time) continue;
         if (/unfilled/i.test(name)) name = 'UNFILLED';
 
@@ -41,25 +43,39 @@
           data[area][name] = Object.fromEntries(DAYS.map(d => [d, []]));
           order[area].push(name);
         }
-        data[area][name][day].push(time.replace('–','-'));
+        data[area][name][day].push({ time: time.replace('–','-'), role });
       }
     }
 
     return { data, order };
   }
 
+  function renderedShift(area, shift) {
+    const time = esc(shift.time);
+    if (area === 'restaurant' && shift.role === 'pots') {
+      return `<span class="shiftPart"><span class="dutyTag potsTag">POTS</span><span>${time}</span></span>`;
+    }
+    if (area === 'restaurant' && shift.role === 'running') {
+      return `<span class="shiftPart"><span class="dutyTag runningTag">RUNNING</span><span>${time}</span></span>`;
+    }
+    return `<span class="shiftPart"><span>${time}</span></span>`;
+  }
+
   function tableFor(area, parsed) {
     const people = parsed.order[area];
     const title = area === 'restaurant' ? 'Restaurant' : 'Bar';
+    const legend = area === 'restaurant'
+      ? '<div class="legend"><span class="dutyTag potsTag">POTS</span> pot wash duty <span class="legendGap">·</span> <span class="dutyTag runningTag">RUNNING</span> food running duty</div>'
+      : '';
     const body = people.map(name => {
       const cells = DAYS.map(day => {
         const shifts = parsed.data[area][name][day];
-        return `<td>${shifts.length ? shifts.map(esc).join(' / ') : '<span class="dash">—</span>'}</td>`;
+        return `<td>${shifts.length ? shifts.map(s => renderedShift(area, s)).join('<span class="sep"> / </span>') : '<span class="dash">—</span>'}</td>`;
       }).join('');
       return `<tr class="${name === 'UNFILLED' ? 'unfilledRow' : ''}"><th scope="row">${esc(name)}</th>${cells}</tr>`;
     }).join('');
 
-    return `<section class="rotaSection"><h2>${title}</h2><div class="tableWrap"><table><thead><tr><th class="nameHead">Staff</th>${DAYS.map(d => `<th>${d}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div></section>`;
+    return `<section class="rotaSection"><h2>${title}</h2>${legend}<div class="tableWrap"><table><thead><tr><th class="nameHead">Staff</th>${DAYS.map(d => `<th>${d}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div></section>`;
   }
 
   function buildExportHtml() {
@@ -82,6 +98,8 @@ h1{font:700 27px/1.05 Georgia,serif;margin:0;color:var(--green)}
 .v2{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);white-space:nowrap}
 .rotaSection{margin:0 0 28px}
 h2{font:700 19px Georgia,serif;color:var(--green);margin:0 0 7px}
+.legend{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin:0 0 8px;font-size:10px;color:var(--muted)}
+.legendGap{margin:0 3px}
 .tableWrap{width:100%;overflow-x:auto}
 table{border-collapse:collapse;width:100%;min-width:900px;table-layout:fixed;border:1px solid var(--line)}
 th,td{border:1px solid var(--line);padding:8px 7px;text-align:center;vertical-align:middle;font-size:12px;line-height:1.25}
@@ -90,10 +108,14 @@ thead th{background:var(--green);color:var(--cream);font-weight:800}
 tbody th{background:var(--cream);text-align:left;color:var(--green);font-weight:800;width:145px}
 tbody tr:nth-child(even) td{background:#FAF9F6}
 .dash{color:#B0B2AE}
+.shiftPart{display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap}
+.dutyTag{display:inline-block;padding:1px 4px;border:1px solid var(--green);border-radius:4px;background:var(--cream);color:var(--green);font-size:9px;font-weight:900;letter-spacing:.05em;line-height:1.35}
+.runningTag{border-style:dashed}
+.sep{color:var(--muted);padding:0 2px}
 .unfilledRow th,.unfilledRow td{color:var(--red);font-weight:800}
 .footer{font-size:10px;color:var(--muted);text-align:right;margin-top:8px}
 @page{size:landscape;margin:10mm}
-@media print{body{padding:0}.tableWrap{overflow:visible}table{min-width:0;font-size:10px}th,td{padding:5px 4px}.rotaSection{break-inside:avoid}.header{margin-bottom:14px}.footer{display:none}}
+@media print{body{padding:0}.tableWrap{overflow:visible}table{min-width:0;font-size:10px}th,td{padding:5px 4px}.rotaSection{break-inside:avoid}.header{margin-bottom:14px}.footer{display:none}.dutyTag{font-size:8px;padding:1px 3px}}
 @media(max-width:700px){body{padding:14px}.header{align-items:flex-start;flex-direction:column;gap:5px}h1{font-size:23px}.tableWrap{border:1px solid var(--line)}table{border:0}}
 </style>
 </head>
@@ -142,12 +164,8 @@ ${tableFor('bar', parsed)}
     button.textContent = 'Saving…';
 
     try {
-      // Use a real HTML download first. The previous Web Share route could
-      // turn the export into a one-line text item on iOS/in-app browsers.
       downloadHtml(html);
 
-      // iOS/in-app browsers can ignore the download attribute. Give the user
-      // an immediately visible fallback containing the complete rota table.
       const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       if (isiOS) {
         setTimeout(() => {
