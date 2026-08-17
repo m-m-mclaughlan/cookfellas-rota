@@ -5,7 +5,7 @@
   if (!button) return;
 
   const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  const filename = 'cookfellas-smart-rota-v2.html';
+  const filename = 'cookfellas-weekly-rota.html';
 
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
@@ -106,7 +106,30 @@ ${tableFor('bar', parsed)}
 </html>`;
   }
 
-  async function saveRota(event) {
+  function downloadHtml(html) {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    return true;
+  }
+
+  function openPreview(html) {
+    const w = window.open('', '_blank');
+    if (!w) return false;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    return true;
+  }
+
+  function saveRota(event) {
     event?.preventDefault?.();
     const html = buildExportHtml();
     if (!html) {
@@ -116,37 +139,29 @@ ${tableFor('bar', parsed)}
 
     button.disabled = true;
     const oldText = button.textContent;
-    button.textContent = 'Preparing…';
+    button.textContent = 'Saving…';
 
     try {
-      const file = new File([html], filename, { type: 'text/html' });
+      // Use a real HTML download first. The previous Web Share route could
+      // turn the export into a one-line text item on iOS/in-app browsers.
+      downloadHtml(html);
 
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({ title: 'Cookfellas Weekly Rota', files: [file] });
-          return;
-        } catch (err) {
-          if (err && err.name === 'AbortError') return;
-          console.warn('File share failed; falling back to browser download', err);
-        }
+      // iOS/in-app browsers can ignore the download attribute. Give the user
+      // an immediately visible fallback containing the complete rota table.
+      const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (isiOS) {
+        setTimeout(() => {
+          if (document.visibilityState === 'visible') openPreview(html);
+        }, 500);
       }
-
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (err) {
       console.error(err);
-      alert('Could not save the rota. Try opening this page in Safari and tap Save rota again.');
+      if (!openPreview(html)) alert('Could not save or open the rota export.');
     } finally {
-      button.disabled = false;
-      button.textContent = oldText;
+      setTimeout(() => {
+        button.disabled = false;
+        button.textContent = oldText;
+      }, 700);
     }
   }
 
