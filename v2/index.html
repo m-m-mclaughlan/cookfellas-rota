@@ -7,7 +7,6 @@
 <link rel="stylesheet" href="./style.css?v=20260817-1030" />
 <style>
   .rules{display:none!important}
-  .staffRow .level,.staffRow .checkWrap,.staffRow .contractType,.staffRow .target,.staffRow .staffMeta,.staffRow .avail{display:none!important}
 </style>
 </head>
 <body>
@@ -16,7 +15,7 @@
     <div>
       <div class="eyebrow">Cookfella's Bar &amp; Eatery · V2</div>
       <div class="title">Smart Rota</div>
-      <div class="sub">Clean baseline. Define the coverage the business needs; the rota currently applies no staffing or optimisation constraints.</div>
+      <div class="sub">Clean baseline. Define the coverage the business needs; roster settings remain editable but are not yet applied by the generator.</div>
     </div>
     <div class="actions">
       <button class="btn" id="importLegacy">Import current V2 roster</button>
@@ -29,7 +28,7 @@
   <div class="grid">
     <section class="panel">
       <h2>Coverage requirements</h2>
-      <p class="hint">Coverage is the only requirement in Baseline 0.6. Every required half-hour block must be staffed. No manager, contract, skill, availability, workday, split or shift-length rules are active.</p>
+      <p class="hint">Coverage is the only active requirement in Baseline 0.6.1. Every required half-hour block must be staffed. No manager, contract, skill, availability, workday, split or shift-length rules are active yet.</p>
       <div class="daytabs" id="dayTabs"></div>
       <div class="hoursRow">
         <div class="field"><label>Staffing begins</label><input type="time" id="siteOpen"></div>
@@ -42,8 +41,8 @@
     </section>
 
     <section class="panel">
-      <h2>Staff roster · baseline</h2>
-      <p class="hint">Only the staff names are used at this stage. All previous skill, availability, contract, manager and preference settings are ignored while we rebuild the rules from scratch.</p>
+      <h2>Staff roster · settings inactive</h2>
+      <p class="hint">Keep the roster configured as normal. Skill level, manager status, Bar preference, contract type/hours, preferred minimum shift, max workdays, wanted days and availability are all stored and editable, but Baseline 0.6.1 deliberately ignores them when generating.</p>
       <div class="actions" style="margin-bottom:9px"><button class="btn small" id="addStaff">+ Staff</button><span class="badge" id="staffSource"></span></div>
       <div class="staffList" id="staffList"></div>
     </section>
@@ -55,10 +54,10 @@
     <div class="metrics" id="metrics"></div>
     <div id="warnings"></div>
     <div class="rotaGrid" id="rotaGrid"></div>
-    <div class="footerNote">V2 Baseline 0.6 deliberately applies no business or staff optimisation rules. It exists to prove the coverage requirement itself can be staffed before constraints are reintroduced one at a time.</div>
+    <div class="footerNote">V2 Baseline 0.6.1 applies coverage only. All roster settings remain available and saved, ready to be reintroduced as active constraints one at a time.</div>
   </section>
 </div>
-<div class="build">V2 · Baseline 0.6</div>
+<div class="build">V2 · Baseline 0.6.1</div>
 <script src="./smart.js?v=20260817-1006"></script>
 <script src="./export-fix.js?v=20260817-1048"></script>
 <script src="./baseline-optimizer.js?v=20260817-1247"></script>
