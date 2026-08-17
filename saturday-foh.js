@@ -19,11 +19,11 @@ window.applySaturdayFohPatch = function (html) {
     }
 
     // Saturday Bar coverage:
-    // 1 person at lunch, 2 through the afternoon, 3 from 5pm to finish.
-    // Tyler remains anchored to one 2-f slot; the second 2-f and the 5-f
-    // closing slot are filled independently by other floor-trained staff.
+    // Open at 11am. One person through lunch, two through the afternoon,
+    // three from 5pm to finish. Tyler remains anchored to one 2-f slot;
+    // the second 2-f and 5-f closing slot are filled independently.
     const oldSaturdayBar = '{"day":"Sat","role":"bar","time":"11:30-2:30","isOpen":true},{"day":"Sat","role":"bar","time":"2-f"},{"day":"Sat","role":"bar","time":"5-f (closedown)","isClose":true},{"day":"Sun"';
-    const newSaturdayBar = '{"day":"Sat","role":"bar","time":"11:30-2:30","isOpen":true},{"day":"Sat","role":"bar","time":"2-f"},{"day":"Sat","role":"bar","time":"2-f"},{"day":"Sat","role":"bar","time":"5-f (closedown)","isClose":true},{"day":"Sun"';
+    const newSaturdayBar = '{"day":"Sat","role":"bar","time":"11-2:30","isOpen":true},{"day":"Sat","role":"bar","time":"2-f"},{"day":"Sat","role":"bar","time":"2-f"},{"day":"Sat","role":"bar","time":"5-f (closedown)","isClose":true},{"day":"Sun"';
 
     if (html.includes(oldSaturdayBar)) {
       html = html.replace(oldSaturdayBar, newSaturdayBar);
