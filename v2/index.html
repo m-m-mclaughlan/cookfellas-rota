@@ -25,7 +25,7 @@
   <div class="grid">
     <section class="panel">
       <h2>Coverage requirements</h2>
-      <p class="hint">Requirement times are demand windows, not fixed shift boundaries. Smart 0.5.2 can build longer shifts such as 11:30–8 or 11:30–9, but full required coverage is now absolute: an incomplete rota cannot be accepted or saved.</p>
+      <p class="hint">Requirement times are demand windows, not fixed shift boundaries. Smart 0.5.3 requires complete coverage and can backtrack across the whole week when an early assignment blocks a later shift.</p>
       <div class="daytabs" id="dayTabs"></div>
       <div class="hoursRow">
         <div class="field"><label>Staffing begins / manager open</label><input type="time" id="siteOpen"></div>
@@ -45,7 +45,7 @@
 
     <section class="panel">
       <h2>Staff needs &amp; constraints</h2>
-      <p class="hint">Availability and skill are hard rules. Full required coverage is mandatory. Saturday management is reserved before easier weekday hours, Friday management is protected, then contracted hours are preferred before zero-hours.</p>
+      <p class="hint">Availability and skill are hard rules. Full required coverage is mandatory. If the flexible optimiser gets stuck, the global solver can undo earlier assignments and search the whole week before declaring the rota impossible.</p>
       <div class="actions" style="margin-bottom:9px"><button class="btn small" id="addStaff">+ Staff</button><span class="badge" id="staffSource"></span></div>
       <div class="staffList" id="staffList"></div>
     </section>
@@ -57,15 +57,16 @@
     <div class="metrics" id="metrics"></div>
     <div id="warnings"></div>
     <div class="rotaGrid" id="rotaGrid"></div>
-    <div class="footerNote">V2 Smart 0.5.2 treats coverage as a half-hour demand curve rather than fixed shifts. Full required coverage and manager opening/closing cover are hard publication gates. If the normal optimiser leaves any gap, rescue mode relaxes only shift-shape preferences; if a complete valid rota still cannot be found, nothing incomplete can be saved.</div>
+    <div class="footerNote">V2 Smart 0.5.3 keeps full required coverage as a hard publication gate. Normal flexible optimisation runs first; if that fails, a global feasibility solver searches the whole week with backtracking, prioritising scarce roles and Fri/Sat demand before easy weekday staffing.</div>
   </section>
 </div>
-<div class="build">V2 · Smart 0.5.2</div>
+<div class="build">V2 · Smart 0.5.3</div>
 <script src="./smart.js?v=20260817-1006"></script>
 <script src="./business-rules.js?v=20260817-1111"></script>
 <script src="./day-copy.js?v=20260817-1030"></script>
 <script src="./export-fix.js?v=20260817-1048"></script>
 <script src="./flexible-optimizer-v2.js?v=20260817-1148"></script>
 <script src="./coverage-gate.js?v=20260817-1201"></script>
+<script src="./global-feasibility.js?v=20260817-1236"></script>
 </body>
 </html>
