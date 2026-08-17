@@ -69,7 +69,7 @@
       for(let i=0;i<ds.length;i++){
         const sh=ds[i];
         if(i){const prev=ds[i-1];if(sh.start<prev.end)return false;const gap=sh.start-prev.end;if(gap>0&&gap<(Number(state.rules?.splitGap)||0)*60)return false}
-        if(runStart==null||sh.start!==lastEnd){runStart=sh.start;lastEnd=sh.end}else{lastEnd=sh.end}
+        if(runStart==null||sh.start!==lastEnd){runStart=sh.start;lastEnd=sh.end}else lastEnd=sh.end;
         if((lastEnd-runStart)/60>(Number(state.rules?.maxContinuous)||10)+.001)return false;
       }
     }
@@ -116,19 +116,49 @@
     const q=quality(state,assign);return q.manager>=floor.manager&&q.core>=floor.core;
   }
   const cloneAssign=a=>a.map(x=>({...x}));
+  const poolCount=(state,sh)=>state.staff.filter(s=>skillOk(s,sh)&&availOk(s,sh)).length;
 
-  function candidateStaff(state,assign,sh,preferContracted=true){
-    return state.staff.filter(s=>skillOk(s,sh)&&availOk(s,sh)).sort((a,b)=>{
+  function candidateStaff(state,assign,sh,preferContracted=true,exclude=new Set()){
+    return state.staff.filter(s=>!exclude.has(s.id)&&skillOk(s,sh)&&availOk(s,sh)).sort((a,b)=>{
       if(preferContracted&&a.contractType!==b.contractType)return a.contractType==='contracted'?-1:1;
       const da=Math.max(0,Number(a.targetHours||0)-personHours(assign,a.id));
       const db=Math.max(0,Number(b.targetHours||0)-personHours(assign,b.id));
       if(da!==db)return db-da;
-      return Number(b.isManager)-Number(a.isManager);
+      if(a.isManager!==b.isManager&&['Fri','Sat'].includes(sh.day)&&sh.start<21*60&&sh.end>17*60)return a.isManager?-1:1;
+      return personHours(assign,a.id)-personHours(assign,b.id);
     });
   }
 
+  function evictionSets(assign,staffId,targetKey){
+    const owned=assign.filter(x=>x.staffId===staffId&&x.key!==targetKey);
+    const sets=[];
+    for(const sh of owned)sets.push([sh.key]);
+    for(const day of DAYS){
+      const keys=owned.filter(x=>x.day===day).map(x=>x.key);
+      if(keys.length>1)sets.push(keys);
+    }
+    const uniq=new Map();for(const s of sets){const k=[...s].sort((a,b)=>a-b).join(',');uniq.set(k,s)}
+    return [...uniq.values()].sort((a,b)=>a.length-b.length);
+  }
+
+  function rehomeBundle(state,assign,keys,depth,floor,seen,budget,blockedStaff){
+    if(!keys.length)return acceptable(state,assign,floor)?assign:null;
+    const ordered=[...keys].sort((ka,kb)=>{
+      const a=assign.find(x=>x.key===ka),b=assign.find(x=>x.key===kb);
+      return (a?poolCount(state,a):99)-(b?poolCount(state,b):99);
+    });
+    const key=ordered[0],rest=ordered.slice(1),sh=assign.find(x=>x.key===key);if(!sh)return null;
+    for(const r of candidateStaff(state,assign,sh,true,new Set([blockedStaff]))){
+      const placed=searchPlace(state,assign,key,r.id,depth,floor,new Set(seen),budget);
+      if(!placed)continue;
+      const done=rehomeBundle(state,placed,rest,depth,floor,new Set(seen),budget,blockedStaff);
+      if(done)return done;
+    }
+    return null;
+  }
+
   function searchPlace(state,assign,targetKey,staffId,depth,floor,seen,budget){
-    if(budget.n++>3500)return null;
+    if(budget.n++>25000)return null;
     const sig=`${targetKey}:${staffId}:${depth}:${assign.map(x=>x.staffId||'_').join(',')}`;
     if(seen.has(sig))return null;seen.add(sig);
     let next=cloneAssign(assign);const target=next.find(x=>x.key===targetKey);if(!target)return null;target.staffId=staffId;
@@ -136,26 +166,25 @@
     if(personValid(state,next,s))return acceptable(state,next,floor)?next:null;
     if(depth<=0)return null;
 
-    const owned=next.filter(x=>x.staffId===staffId&&x.key!==targetKey).sort((a,b)=>hours(a.start,a.end)-hours(b.start,b.end));
-    for(const old of owned){
-      let base=cloneAssign(next);const oldCopy=base.find(x=>x.key===old.key);oldCopy.staffId=null;
-      const s2=state.staff.find(x=>x.id===staffId);
-      if(!personValid(state,base,s2))continue;
-      for(const r of candidateStaff(state,base,oldCopy,true)){
-        if(r.id===staffId)continue;
-        const placed=searchPlace(state,base,old.key,r.id,depth-1,floor,new Set(seen),budget);
-        if(placed&&acceptable(state,placed,floor))return placed;
-      }
+    for(const keys of evictionSets(next,staffId,targetKey)){
+      let base=cloneAssign(next);
+      for(const k of keys){const sh=base.find(x=>x.key===k);if(sh)sh.staffId=null}
+      if(!personValid(state,base,s))continue;
+      const repaired=rehomeBundle(state,base,keys,depth-1,floor,new Set(seen),budget,staffId);
+      if(repaired&&acceptable(state,repaired,floor))return repaired;
     }
     return null;
   }
 
   function improve(state,start){
-    let assign=cloneAssign(start),floor={manager:managerPeak(state,assign),core:coreSaturday(state,assign)};
-    for(let pass=0;pass<8;pass++){
-      let best=null,bestQ=quality(state,assign),changed=false;
+    let assign=cloneAssign(start);
+    const floor={manager:managerPeak(state,assign),core:coreSaturday(state,assign)};
+    for(let pass=0;pass<10;pass++){
+      let best=null,bestQ=quality(state,assign);
       const targets=assign.filter(x=>!x.staffId||state.staff.find(s=>s.id===x.staffId)?.contractType==='zeroHours').sort((a,b)=>{
-        const au=!a.staffId?0:1,bu=!b.staffId?0:1;if(au!==bu)return au-bu;return hours(b.start,b.end)-hours(a.start,a.end);
+        const au=!a.staffId?0:1,bu=!b.staffId?0:1;if(au!==bu)return au-bu;
+        const pa=poolCount(state,a),pb=poolCount(state,b);if(pa!==pb)return pa-pb;
+        return hours(b.start,b.end)-hours(a.start,a.end);
       });
       for(const target of targets){
         const contracted=state.staff.filter(s=>s.contractType==='contracted'&&skillOk(s,target)&&availOk(s,target)).sort((a,b)=>{
@@ -164,16 +193,13 @@
         });
         for(const c of contracted){
           if(target.staffId===c.id)continue;
-          const cand=searchPlace(state,assign,target.key,c.id,3,floor,new Set(),{n:0});
+          const cand=searchPlace(state,assign,target.key,c.id,5,floor,new Set(),{n:0});
           if(!cand)continue;
-          const q=quality(state,cand);
-          if(better(q,bestQ)){best=cand;bestQ=q;changed=true}
+          const q=quality(state,cand);if(better(q,bestQ)){best=cand;bestQ=q}
         }
       }
-      if(!changed||!best)break;
+      if(!best)break;
       assign=best;
-      floor.manager=Math.max(floor.manager,Math.min(bestQ.manager,floor.manager));
-      floor.core=Math.max(floor.core,Math.min(bestQ.core,floor.core));
     }
     return assign;
   }
@@ -190,9 +216,9 @@
     if(miss>0)warnings.push(`${miss.toFixed(1)} staff-hours of required coverage remain unfilled.`);
     for(const s of state.staff.filter(isCore))if(!assign.some(x=>x.staffId===s.id&&x.day==='Sat'&&x.start<21*60&&x.end>17*60))warnings.push(`Saturday 5–9 preference not achieved for ${s.name}`);
     warnings.push(`Fri/Sat important-time manager score protected at ${managerPeak(state,assign)}.`);
-    warnings.push(`Zero-hours usage after chained repair: ${zero.toFixed(1)}h.`);
+    warnings.push(`Zero-hours usage after bundled repair: ${zero.toFixed(1)}h.`);
     document.getElementById('warnings').innerHTML=warnings.map(x=>`<div class="warn">⚠ ${x}</div>`).join('');
-    const hint=document.getElementById('resultHint');if(hint)hint.textContent='Generated with scarcity-first assignment, contracted-hours efficiency and chained multi-step repair while protecting important-time manager cover.';
+    const hint=document.getElementById('resultHint');if(hint)hint.textContent='Generated with scarcity-first assignment and bundled multi-step repair, allowing whole day patterns to move while protecting important manager cover.';
   }
 
   function runRepair(){
@@ -203,7 +229,7 @@
 
   button.onclick=function(e){
     const result=previousGenerate.call(this,e);
-    setTimeout(runRepair,40);
+    setTimeout(runRepair,80);
     return result;
   };
 })();
