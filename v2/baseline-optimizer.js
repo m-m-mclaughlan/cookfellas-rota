@@ -4,13 +4,15 @@
   const KEY='cookfellas-smart-v2-config';
   const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const LEVELS=['pots','running','floor'];
+  const PREFERRED_MAX_HOURS=8.5;
+  const HARD_MAX_HOURS=10;
   const button=document.getElementById('generate');
   const download=document.getElementById('download');
   if(!button)return;
 
   const toMin=t=>{if(!t)return null;const [h,m]=String(t).split(':').map(Number);return h*60+m};
   const pretty=m=>{const h=Math.floor(m/60),n=m%60,hh=h>12?h-12:h===0?12:h;return `${hh}${n?':'+String(n).padStart(2,'0'):''}`};
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const readState=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch{return null}};
   const potsSegment=(day,t)=>day==='Sat'?(t<17*60?'sat-11-5':'sat-5-close'):'whole';
 
@@ -77,32 +79,60 @@
     return h*60;
   }
 
-  function incrementalCost(staff,weeklyHours,position,prevByLane){
+  function proposedRunHours(staffId,position,runState){
+    const prev=runState.get(staffId);
+    if(prev&&prev.lastEnd===position.start)return (position.end-prev.runStart)/60;
+    return .5;
+  }
+
+  function shiftLengthOk(staff,position,dayHours,runState){
+    const nextDay=(dayHours.get(staff.id)||0)+.5;
+    const nextRun=proposedRunHours(staff.id,position,runState);
+    return nextDay<=HARD_MAX_HOURS+1e-9&&nextRun<=HARD_MAX_HOURS+1e-9;
+  }
+
+  function liveShiftPenalty(staff,position,dayHours,runState){
+    const nextDay=(dayHours.get(staff.id)||0)+.5;
+    const nextRun=proposedRunHours(staff.id,position,runState);
+    const dayOver=Math.max(0,nextDay-PREFERRED_MAX_HOURS);
+    const runOver=Math.max(0,nextRun-PREFERRED_MAX_HOURS);
+    return dayOver*900+runOver*900;
+  }
+
+  function incrementalCost(staff,weeklyHours,position,prevByLane,dayHours,runState){
     const current=weeklyHours.get(staff.id)||0;
     let cost=hourPenalty(staff,current+.5)-hourPenalty(staff,current);
+    cost+=liveShiftPenalty(staff,position,dayHours,runState);
     const laneKey=`${position.area}|${position.role}`;
     if((prevByLane.get(laneKey)||[]).includes(staff.id))cost-=5;
     return cost;
   }
 
-  function solveBlock(state,positions,weeklyHours,prevByLane,managerRequired){
+  function solveBlock(state,positions,weeklyHours,prevByLane,managerRequired,dayHours,runState){
     const staff=state.staff||[];
     if(positions.length>staff.length)return {ok:false,problem:`Needs ${positions.length} people at once but only ${staff.length} are on the roster.`};
 
-    const enriched=positions.map((p,originalIndex)=>({
-      ...p,
-      originalIndex,
-      eligible:staff.map((s,staffIndex)=>({s,staffIndex})).filter(x=>
+    const enriched=positions.map((p,originalIndex)=>{
+      const base=staff.map((s,staffIndex)=>({s,staffIndex})).filter(x=>
         skillOk(x.s,p)&&
         availabilityOk(x.s,p)&&
         (!p.lockedStaffId||x.s.id===p.lockedStaffId)&&
         !(p.forbiddenStaffIds||[]).includes(x.s.id)
-      )
-    }));
+      );
+      return {
+        ...p,
+        originalIndex,
+        baseEligibleCount:base.length,
+        eligible:base.filter(x=>shiftLengthOk(x.s,p,dayHours,runState))
+      };
+    });
 
     const impossible=enriched.find(p=>p.eligible.length===0);
     if(impossible){
       const role=impossible.area==='bar'?'Bar FOH':impossible.role;
+      if(impossible.baseEligibleCount>0){
+        return {ok:false,problem:`The ${HARD_MAX_HOURS}h hard daily/continuous shift maximum leaves no valid ${role} assignment for this block.`};
+      }
       if(impossible.role==='pots'&&impossible.lockedStaffId){
         return {ok:false,problem:'The person assigned to the full pots shift cannot cover this pots block under the current availability/skills.'};
       }
@@ -122,8 +152,8 @@
 
       const p=enriched[i];
       const candidates=p.eligible.slice().sort((a,b)=>{
-        const ca=incrementalCost(a.s,weeklyHours,p,prevByLane);
-        const cb=incrementalCost(b.s,weeklyHours,p,prevByLane);
+        const ca=incrementalCost(a.s,weeklyHours,p,prevByLane,dayHours,runState);
+        const cb=incrementalCost(b.s,weeklyHours,p,prevByLane,dayHours,runState);
         return ca-cb||String(a.s.name).localeCompare(String(b.s.name));
       });
 
@@ -131,7 +161,7 @@
       for(const c of candidates){
         const bit=1<<c.staffIndex;
         if(usedMask&bit)continue;
-        const own=incrementalCost(c.s,weeklyHours,p,prevByLane);
+        const own=incrementalCost(c.s,weeklyHours,p,prevByLane,dayHours,runState);
         const tail=dfs(i+1,usedMask|bit,hasManager||!!c.s.isManager);
         if(!tail)continue;
         const total=own+tail.cost;
@@ -145,7 +175,7 @@
 
     const solved=dfs(0,0,false);
     if(!solved){
-      if(managerRequired)return {ok:false,problem:'The available staff can cover the skills, but no valid assignment also provides an available manager at this opening/closing block.'};
+      if(managerRequired)return {ok:false,problem:'The available staff can cover the skills, but no valid assignment also provides an available manager at this opening/closing block within the shift-length rules.'};
       return {ok:false,problem:'The available staff cannot cover all required positions without double-booking somebody in this half-hour.'};
     }
 
@@ -161,6 +191,8 @@
     const pieces=[];
     const prevByLane=new Map();
     const potsLocks=new Map();
+    const dayHours=new Map();
+    const runState=new Map();
 
     for(const t of times){
       const positions=[];
@@ -183,7 +215,7 @@
       }
 
       const managerRequired=(t===open)||(t+30===close);
-      const solved=solveBlock(state,positions,weeklyHours,prevByLane,managerRequired);
+      const solved=solveBlock(state,positions,weeklyHours,prevByLane,managerRequired,dayHours,runState);
       if(!solved.ok)return {ok:false,problem:`${day} ${pretty(t)}–${pretty(t+30)}: ${solved.problem}`};
 
       const nextByLane=new Map();
@@ -194,6 +226,10 @@
         }
         pieces.push(x);
         weeklyHours.set(x.staffId,(weeklyHours.get(x.staffId)||0)+.5);
+        dayHours.set(x.staffId,(dayHours.get(x.staffId)||0)+.5);
+        const prevRun=runState.get(x.staffId);
+        if(prevRun&&prevRun.lastEnd===x.start)runState.set(x.staffId,{runStart:prevRun.runStart,lastEnd:x.end});
+        else runState.set(x.staffId,{runStart:x.start,lastEnd:x.end});
         const key=`${x.area}|${x.role}`;
         if(!nextByLane.has(key))nextByLane.set(key,[]);
         nextByLane.get(key).push(x.staffId);
@@ -216,6 +252,30 @@
     const map=new Map((state.staff||[]).map(s=>[s.id,0]));
     for(const x of pieces)map.set(x.staffId,(map.get(x.staffId)||0)+.5);
     return map;
+  }
+
+  function dayStats(pieces,staffId,day,omitPiece=null,addStart=null){
+    const starts=new Set();
+    for(const p of pieces){
+      if(p===omitPiece||p.staffId!==staffId||p.day!==day)continue;
+      starts.add(p.start);
+    }
+    if(addStart!=null)starts.add(addStart);
+    const sorted=[...starts].sort((a,b)=>a-b);
+    let longestBlocks=0,currentBlocks=0,prev=null;
+    for(const start of sorted){
+      if(prev!=null&&start===prev+30)currentBlocks++;
+      else currentBlocks=1;
+      if(currentBlocks>longestBlocks)longestBlocks=currentBlocks;
+      prev=start;
+    }
+    return {totalHours:sorted.length*.5,longestHours:longestBlocks*.5};
+  }
+
+  function dayQualityPenalty(stats){
+    const totalOver=Math.max(0,stats.totalHours-PREFERRED_MAX_HOURS);
+    const runOver=Math.max(0,stats.longestHours-PREFERRED_MAX_HOURS);
+    return totalOver*900+runOver*900;
   }
 
   function rebalanceWeek(state,pieces){
@@ -241,9 +301,15 @@
           if(to.id===from.id||used.has(to.id)||!skillOk(to,x)||!availabilityOk(to,x))continue;
           if(managerRequired&&from.isManager&&!otherManager&&!to.isManager)continue;
 
+          const toAfter=dayStats(pieces,to.id,x.day,null,x.start);
+          if(toAfter.totalHours>HARD_MAX_HOURS+1e-9||toAfter.longestHours>HARD_MAX_HOURS+1e-9)continue;
+
           const fromH=hrs.get(from.id)||0,toH=hrs.get(to.id)||0;
-          const before=hourPenalty(from,fromH)+hourPenalty(to,toH);
-          const after=hourPenalty(from,fromH-.5)+hourPenalty(to,toH+.5);
+          const fromBefore=dayStats(pieces,from.id,x.day);
+          const toBefore=dayStats(pieces,to.id,x.day);
+          const fromAfter=dayStats(pieces,from.id,x.day,x);
+          const before=hourPenalty(from,fromH)+hourPenalty(to,toH)+dayQualityPenalty(fromBefore)+dayQualityPenalty(toBefore);
+          const after=hourPenalty(from,fromH-.5)+hourPenalty(to,toH+.5)+dayQualityPenalty(fromAfter)+dayQualityPenalty(toAfter);
           const delta=after-before;
           if(delta<bestDelta-0.001){bestDelta=delta;bestId=to.id}
         }
@@ -322,17 +388,34 @@
     return problems;
   }
 
+  function shiftLengthCheck(state,pieces){
+    const staffById=new Map((state.staff||[]).map(s=>[s.id,s]));
+    const problems=[];
+    const preferred=[];
+    for(const [id,s] of staffById){
+      for(const day of DAYS){
+        const stats=dayStats(pieces,id,day);
+        if(stats.totalHours>HARD_MAX_HOURS+1e-9||stats.longestHours>HARD_MAX_HOURS+1e-9){
+          problems.push(`${s.name} ${day}: ${stats.totalHours.toFixed(1)}h worked / ${stats.longestHours.toFixed(1)}h continuous exceeds the ${HARD_MAX_HOURS}h hard maximum`);
+        }else if(stats.totalHours>PREFERRED_MAX_HOURS+1e-9||stats.longestHours>PREFERRED_MAX_HOURS+1e-9){
+          preferred.push(`${s.name} ${day} ${stats.totalHours.toFixed(1)}h total${stats.longestHours!==stats.totalHours?` (${stats.longestHours.toFixed(1)}h continuous)`:''}`);
+        }
+      }
+    }
+    return {problems,preferred};
+  }
+
   function renderFailure(problem){
     if(download)download.disabled=true;
     const panel=document.getElementById('resultsPanel');panel.style.display='block';
-    document.getElementById('resultHint').textContent='No rota published. Coverage, skills, roster availability, whole-shift pots and mandatory manager opening/closing cover are hard rules.';
+    document.getElementById('resultHint').textContent=`No rota published. Coverage, skills, roster availability, whole-shift pots, manager cover and the ${HARD_MAX_HOURS}h hard shift limit are hard rules.`;
     document.getElementById('metrics').innerHTML='<div class="metric"><div class="k">Rota status</div><div class="v">INVALID</div></div>';
     document.getElementById('warnings').innerHTML=`<div class="warn"><strong>Core-rule failure:</strong> ${esc(problem)}</div>`;
     document.getElementById('rotaGrid').innerHTML='';
     panel.scrollIntoView({behavior:'smooth',block:'start'});
   }
 
-  function renderSuccess(state,lanes,assign,weeklyHours){
+  function renderSuccess(state,lanes,assign,weeklyHours,preferredLong=[]){
     const panel=document.getElementById('resultsPanel');panel.style.display='block';
     const required=requiredHours(lanes);
     const contracted=(state.staff||[]).filter(s=>s.contractType==='contracted'&&targetOf(s)>0);
@@ -342,7 +425,7 @@
     const deficit=contracted.reduce((z,s)=>z+Math.max(0,targetOf(s)-(weeklyHours.get(s.id)||0)),0);
     const zeroUsed=(state.staff||[]).filter(s=>s.contractType!=='contracted'||targetOf(s)===0).reduce((z,s)=>z+(weeklyHours.get(s.id)||0),0);
 
-    document.getElementById('resultHint').textContent='Core mode: coverage, skills, availability, whole-shift pots and manager opening/closing cover are hard. Saturday pots is split into 11–5 and 5–close with different people. Contracted targets are balanced within those hard constraints.';
+    document.getElementById('resultHint').textContent=`Core mode: coverage, skills, availability, whole-shift pots, manager opening/closing cover and a ${HARD_MAX_HOURS}h hard daily/continuous maximum are hard. ${PREFERRED_MAX_HOURS}h is the preferred maximum.`;
     document.getElementById('metrics').innerHTML=[
       ['Required labour',required.toFixed(1)+'h'],
       ['Unfilled coverage','0.0h'],
@@ -351,14 +434,19 @@
       ['Contract deficit',deficit.toFixed(1)+'h'],
       ['Contract overtime',overtime.toFixed(1)+'h'],
       ['Other / zero-hours',zeroUsed.toFixed(1)+'h'],
-      ['Active rule groups','5']
+      ['Preferred max',PREFERRED_MAX_HOURS.toFixed(1)+'h'],
+      ['Hard max',HARD_MAX_HOURS.toFixed(1)+'h'],
+      ['Active rule groups','6']
     ].map(([k,v])=>`<div class="metric"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
 
     const targetNotes=contracted.map(s=>{
       const used=weeklyHours.get(s.id)||0,target=targetOf(s),diff=used-target;
       return `${esc(s.name)} ${used.toFixed(1)} / ${target.toFixed(1)}h${Math.abs(diff)<.01?' ✓':diff>0?` (+${diff.toFixed(1)})`:` (${diff.toFixed(1)})`}`;
     }).join(' · ');
-    document.getElementById('warnings').innerHTML=`<div class="ok">✓ CORE RULES PASSED — every required half-hour is skill-covered, all roster availability is respected, each pots shift stays with one person, Saturday uses separate 11–5 and 5–close pots staff, and manager open/close cover is present.</div><div class="ok">Contracted: ${targetNotes||'none configured'}</div>`;
+    const longNote=preferredLong.length
+      ? `<div class="warn"><strong>Preferred ${PREFERRED_MAX_HOURS}h maximum exceeded where needed:</strong> ${preferredLong.map(esc).join(' · ')}</div>`
+      : `<div class="ok">✓ SHIFT LENGTH TARGET PASSED — no one exceeds the preferred ${PREFERRED_MAX_HOURS}h daily/continuous maximum.</div>`;
+    document.getElementById('warnings').innerHTML=`<div class="ok">✓ CORE RULES PASSED — coverage, skills, availability, pots rules, manager cover and the ${HARD_MAX_HOURS}h hard maximum all pass.</div><div class="ok">Contracted: ${targetNotes||'none configured'}</div>${longNote}`;
 
     const grid=document.getElementById('rotaGrid');grid.innerHTML='';
     for(const day of DAYS){
@@ -390,10 +478,11 @@
     }
 
     const balanced=rebalanceWeek(state,pieces);
-    const problems=[...availabilityCheck(state,balanced.pieces),...managerCheck(state,balanced.pieces),...potsWholeShiftCheck(balanced.pieces)];
+    const lengths=shiftLengthCheck(state,balanced.pieces);
+    const problems=[...availabilityCheck(state,balanced.pieces),...managerCheck(state,balanced.pieces),...potsWholeShiftCheck(balanced.pieces),...lengths.problems];
     if(problems.length){renderFailure(problems.join(' · '));return}
     const merged=mergePieces(balanced.pieces);
-    renderSuccess(state,lanes,merged,balanced.hours);
+    renderSuccess(state,lanes,merged,balanced.hours,lengths.preferred);
   }
 
   button.onclick=generate;
