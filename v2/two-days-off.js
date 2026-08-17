@@ -62,43 +62,14 @@
     const grouped=new Set();
     const groups=[];
     if(fran&&tyler){
-      groups.push({members:[fran,tyler],shared:true});
+      groups.push({id:'fran-tyler',members:[fran,tyler],shared:true});
       grouped.add(fran.id);grouped.add(tyler.id);
     }
     const rest=staff.filter(s=>!grouped.has(s.id)).sort((a,b)=>
       Number(b.isManager)-Number(a.isManager)||targetOf(b)-targetOf(a)||String(a.name).localeCompare(String(b.name))
     );
-    for(const s of rest)groups.push({members:[s],shared:false});
+    for(const s of rest)groups.push({id:String(s.id),members:[s],shared:false});
     return groups;
-  }
-
-  function buildBeam(state){
-    const groups=buildGroups(state);
-    let beam=[{score:0,choices:[]}];
-    const WIDTH=320;
-    for(const group of groups){
-      const options=PAIRS.map(pair=>({
-        pair,
-        cost:group.members.reduce((z,s)=>z+pairCost(state,s,pair),0)
-      })).sort((a,b)=>a.cost-b.cost);
-      const next=[];
-      for(const item of beam){
-        for(const option of options){
-          next.push({score:item.score+option.cost,choices:[...item.choices,{group,pair:option.pair}]});
-        }
-      }
-      next.sort((a,b)=>a.score-b.score);
-      beam=next.slice(0,WIDTH);
-    }
-    return beam;
-  }
-
-  function offMapFromCandidate(candidate){
-    const map=new Map();
-    for(const choice of candidate.choices){
-      for(const s of choice.group.members)map.set(s.id,choice.pair);
-    }
-    return map;
   }
 
   function isOff(offMap,staff,day){
@@ -151,8 +122,8 @@
     return dfs(0,false);
   }
 
-  function planFeasible(state,offMap){
-    for(const day of DAYS){
+  function daysFeasible(state,offMap,days){
+    for(const day of days){
       const site=state.siteHours?.[day];
       const open=toMin(site?.open),close=toMin(site?.close);
       if(open==null||close==null||close<=open)continue;
@@ -163,13 +134,104 @@
     return true;
   }
 
-  function choosePlan(state){
-    const beam=buildBeam(state);
-    for(const candidate of beam){
-      const offMap=offMapFromCandidate(candidate);
-      if(planFeasible(state,offMap))return {candidate,offMap};
+  function planFeasible(state,offMap){
+    return daysFeasible(state,offMap,DAYS);
+  }
+
+  function setGroupPair(offMap,group,pair){
+    for(const s of group.members)offMap.set(s.id,pair);
+  }
+
+  function clearGroupPair(offMap,group){
+    for(const s of group.members)offMap.delete(s.id);
+  }
+
+  // Pressure is only a search-order heuristic. It steers days off away from
+  // blocks that are already close to their staffing/manager limits, while the
+  // exact feasibility checker above remains the hard test.
+  function pairPressure(state,offMap,pair){
+    const staff=state.staff||[];
+    let pressure=0;
+    for(const day of pair){
+      const site=state.siteHours?.[day];
+      const open=toMin(site?.open),close=toMin(site?.close);
+      if(open==null||close==null||close<=open)continue;
+      for(let t=open;t<close;t+=30){
+        const positions=positionsForBlock(state,day,t);
+        if(!positions.length)continue;
+        const available=staff.filter(s=>!isOff(offMap,s,day)&&availabilityOk(s,{day,start:t,end:t+30,area:'restaurant',role:'pots'}));
+        const slack=available.length-positions.length;
+        pressure+=100/Math.max(1,slack+1);
+        if(t===open||t+30===close){
+          const managers=staff.filter(s=>s.isManager&&!isOff(offMap,s,day)&&availabilityOk(s,{day,start:t,end:t+30,area:'restaurant',role:'floor'})).length;
+          pressure+=400/Math.max(1,managers);
+        }
+      }
     }
-    return null;
+    return pressure;
+  }
+
+  function choosePlan(state){
+    const groups=buildGroups(state);
+    const offMap=new Map();
+    let nodes=0;
+    const started=performance.now();
+    const memo=new Set();
+
+    function domainFor(group){
+      const options=[];
+      for(const pair of PAIRS){
+        setGroupPair(offMap,group,pair);
+        const feasible=daysFeasible(state,offMap,pair);
+        if(feasible){
+          const base=group.members.reduce((z,s)=>z+pairCost(state,s,pair),0);
+          options.push({pair,score:base+pairPressure(state,offMap,pair)});
+        }
+        clearGroupPair(offMap,group);
+      }
+      options.sort((a,b)=>a.score-b.score||PAIRS.findIndex(p=>p===a.pair)-PAIRS.findIndex(p=>p===b.pair));
+      return options;
+    }
+
+    function snapshotKey(remaining){
+      const assigned=(state.staff||[]).map(s=>`${s.id}:${(offMap.get(s.id)||[]).join('-')}`).filter(x=>!x.endsWith(':')).sort().join('|');
+      return remaining.map(g=>g.id).sort().join(',')+'//'+assigned;
+    }
+
+    function dfs(remaining){
+      nodes++;
+      if(!remaining.length)return planFeasible(state,offMap)?new Map(offMap):null;
+
+      const key=snapshotKey(remaining);
+      if(memo.has(key))return null;
+
+      // Minimum-remaining-values: choose whichever staff/group currently has
+      // the fewest viable consecutive-day pairs. This prevents the previous
+      // beam-search false negatives caused by committing to cheap pairs early.
+      let selected=null,selectedOptions=null;
+      for(const group of remaining){
+        const options=domainFor(group);
+        if(!options.length){memo.add(key);return null}
+        if(!selectedOptions||options.length<selectedOptions.length){
+          selected=group;selectedOptions=options;
+          if(options.length===1)break;
+        }
+      }
+
+      const nextRemaining=remaining.filter(g=>g!==selected);
+      for(const option of selectedOptions){
+        setGroupPair(offMap,selected,option.pair);
+        const result=dfs(nextRemaining);
+        if(result)return result;
+        clearGroupPair(offMap,selected);
+      }
+
+      memo.add(key);
+      return null;
+    }
+
+    const result=dfs(groups);
+    return result?{offMap:result,nodes,ms:Math.round(performance.now()-started)}:null;
   }
 
   function applyPlan(state,offMap){
@@ -186,14 +248,14 @@
     const panel=document.getElementById('resultsPanel');
     if(!panel)return;
     panel.style.display='block';
-    document.getElementById('resultHint').textContent='No rota published. The mandatory consecutive-days-off rule cannot be combined with the current coverage, skills, availability and manager requirements.';
+    document.getElementById('resultHint').textContent='No rota published. A complete consecutive-days-off search could not find a schedule-compatible set of off-day pairs.';
     document.getElementById('metrics').innerHTML='<div class="metric"><div class="k">Rota status</div><div class="v">INVALID</div></div>';
-    document.getElementById('warnings').innerHTML='<div class="warn"><strong>Two-days-off failure:</strong> No feasible set of consecutive off-day pairs was found. Fran and Tyler must also share the same pair.</div>';
+    document.getElementById('warnings').innerHTML='<div class="warn"><strong>Two-days-off failure:</strong> Every possible pair was searched under the current coverage, skills, availability and manager rules. Fran and Tyler must also share the same pair.</div>';
     document.getElementById('rotaGrid').innerHTML='';
     panel.scrollIntoView({behavior:'smooth',block:'start'});
   }
 
-  function appendPlanSummary(state,offMap){
+  function appendPlanSummary(state,offMap,meta){
     const warnings=document.getElementById('warnings');
     if(!warnings)return;
     const staff=state.staff||[];
@@ -205,7 +267,7 @@
     };
     const shared=fran&&tyler?`Fran &amp; Tyler: ${(offMap.get(fran.id)||[]).join(' + ')} (shared)`:'Fran/Tyler shared pair not applicable';
     const all=staff.map(pairText).join(' · ');
-    warnings.insertAdjacentHTML('beforeend',`<div class="ok">✓ TWO CONSECUTIVE DAYS OFF PASSED — ${shared}</div><div class="ok">Reserved off pairs: ${all}</div>`);
+    warnings.insertAdjacentHTML('beforeend',`<div class="ok">✓ TWO CONSECUTIVE DAYS OFF PASSED — ${shared}</div><div class="ok">Reserved off pairs: ${all}</div><div class="ok">Off-day search: ${meta?.nodes||0} states checked in ${meta?.ms||0}ms.</div>`);
 
     const metricRoot=document.getElementById('metrics');
     if(metricRoot){
@@ -230,6 +292,6 @@
       else localStorage.setItem(KEY,originalRaw);
     }
 
-    if(download&&!download.disabled)appendPlanSummary(state,plan.offMap);
+    if(download&&!download.disabled)appendPlanSummary(state,plan.offMap,plan);
   };
 })();
