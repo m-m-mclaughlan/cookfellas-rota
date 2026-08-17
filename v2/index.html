@@ -42,7 +42,7 @@
 
     <section class="panel">
       <h2>Staff needs &amp; constraints</h2>
-      <p class="hint">Availability and skill are hard rules. Contracts, fewer workdays, area preference and short-shift preferences influence the optimiser.</p>
+      <p class="hint">Availability and skill are hard rules. Contracted hours are preferred before zero-hours, while useful manager presence is protected at opening, closing and key Fri/Sat periods.</p>
       <div class="actions" style="margin-bottom:9px"><button class="btn small" id="addStaff">+ Staff</button><span class="badge" id="staffSource"></span></div>
       <div class="staffList" id="staffList"></div>
     </section>
@@ -54,14 +54,15 @@
     <div class="metrics" id="metrics"></div>
     <div id="warnings"></div>
     <div class="rotaGrid" id="rotaGrid"></div>
-    <div class="footerNote">V2 Smart 0.4.1 uses scarcity-first assignment plus repair swaps. Hard coverage, availability and skills still win; Saturday 5–9 for Mark, Fran and Tyler is a strong soft preference.</div>
+    <div class="footerNote">V2 Smart 0.4.2 uses scarcity-first assignment, repair swaps and a contracted-hours efficiency pass. Required coverage comes first; manager presence at opening, closing and Fri/Sat 5–9 is protected while zero-hours use is reduced.</div>
   </section>
 </div>
-<div class="build">V2 · Smart 0.4.1</div>
+<div class="build">V2 · Smart 0.4.2</div>
 <script src="./smart.js?v=20260817-1006"></script>
 <script src="./business-rules.js?v=20260817-1111"></script>
 <script src="./day-copy.js?v=20260817-1030"></script>
 <script src="./export-fix.js?v=20260817-1048"></script>
 <script src="./optimizer-v2.js?v=20260817-1100"></script>
+<script src="./efficiency-pass.js?v=20260817-1120"></script>
 </body>
 </html>
