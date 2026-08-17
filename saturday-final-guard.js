@@ -17,17 +17,18 @@ window.applySaturdayFinalGuardPatch = function (html) {
           mins=id=>assigned(id).reduce((z,q)=>z+W(q.slot.time)*60,0),
           floor=s=>!!s&&D(s.level)>=D("floor"),
           room=(s,q)=>{if(!floor(s)||!Q(s,q.slot.day,q.slot.time))return!1;if(assigned(s.id).some(r=>overlap(r,q)))return!1;if(s.contractType==="contracted"&&mins(s.id)+W(q.slot.time)*60>s.contractedHours*60+h*60+.01)return!1;return!0},
-          score=(s,q)=>{let def=s.contractType==="contracted"?Math.max(0,s.contractedHours*60-mins(s.id)):0,bar=s.isBarStaff?-3000:0,mgr=s.isManager?10000:0;return-def*100+bar+mgr+mins(s.id)/10};
+          score=(s,q)=>{let def=s.contractType==="contracted"?Math.max(0,s.contractedHours*60-mins(s.id)):0,bar=s.isBarStaff?-3000:0;return-def*100+bar+mins(s.id)/10};
 
       // This is deliberately the final repair pass. Earlier schedulers may leave
       // a lower-skilled person temporarily occupying a Saturday Bar slot; the
       // Bar floor guard removes that assignment later. Refill any resulting
-      // vacancy here using genuinely available floor-trained staff. Wanted-shift
-      // counts and two-consecutive-days-off remain soft preferences at this point:
-      // required Saturday coverage wins, while availability/skill/overlap/caps do not.
+      // vacancy here using genuinely available floor-trained non-management staff.
+      // Wanted-shift counts and two-consecutive-days-off remain soft preferences
+      // at this point: required Saturday coverage wins, while availability,
+      // skill, overlap and contracted caps remain hard rules.
       let targets=w.filter(q=>q.board==="b"&&q.slot.day==="Sat"&&(q.slot.time==="2-f"||q.slot.time.startsWith("5-f"))&&!j(q));
       for(let q of targets){
-        let candidates=e.filter(s=>room(s,q)).sort((p,z)=>score(p,q)-score(z,q));
+        let candidates=e.filter(s=>!s.isManager&&room(s,q)).sort((p,z)=>score(p,q)-score(z,q));
         if(candidates.length)M(q,candidates[0].id);
         else console.warn('Final Saturday Bar coverage could not fill '+q.slot.time+'.');
       }
