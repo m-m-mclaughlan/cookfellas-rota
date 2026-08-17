@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Cookfella's Smart Rota V2</title>
 <link rel="stylesheet" href="./style.css?v=20260817-1030" />
+<style>
+  .rules{display:none!important}
+  .staffRow .level,.staffRow .checkWrap,.staffRow .contractType,.staffRow .target,.staffRow .staffMeta,.staffRow .avail{display:none!important}
+</style>
 </head>
 <body>
 <div class="app">
@@ -12,12 +16,12 @@
     <div>
       <div class="eyebrow">Cookfella's Bar &amp; Eatery · V2</div>
       <div class="title">Smart Rota</div>
-      <div class="sub">Define the coverage the business actually needs. V2 creates the shifts, then assigns staff around availability, skills, contracts and work-life rules.</div>
+      <div class="sub">Clean baseline. Define the coverage the business needs; the rota currently applies no staffing or optimisation constraints.</div>
     </div>
     <div class="actions">
       <button class="btn" id="importLegacy">Import current V2 roster</button>
       <button class="btn" id="resetCoverage">Reset coverage</button>
-      <button class="btn primary" id="generate">Generate smart rota</button>
+      <button class="btn primary" id="generate">Generate baseline rota</button>
       <button class="btn" id="download" disabled>Save rota</button>
     </div>
   </div>
@@ -25,27 +29,19 @@
   <div class="grid">
     <section class="panel">
       <h2>Coverage requirements</h2>
-      <p class="hint">Requirement times are demand windows, not fixed shift boundaries. Smart 0.5.3 requires complete coverage and can backtrack across the whole week when an early assignment blocks a later shift.</p>
+      <p class="hint">Coverage is the only requirement in Baseline 0.6. Every required half-hour block must be staffed. No manager, contract, skill, availability, workday, split or shift-length rules are active.</p>
       <div class="daytabs" id="dayTabs"></div>
       <div class="hoursRow">
-        <div class="field"><label>Staffing begins / manager open</label><input type="time" id="siteOpen"></div>
+        <div class="field"><label>Staffing begins</label><input type="time" id="siteOpen"></div>
         <div class="field"><label>Site closes</label><input type="time" id="siteClose"></div>
       </div>
       <div id="coverageEditor"></div>
-      <div class="rules">
-        <div class="ruleCard"><div class="miniLabel">Minimum split gap</div><input id="splitGap" type="number" min="0" step="0.5"> <span class="badge">hours</span></div>
-        <div class="ruleCard"><div class="miniLabel">Max continuous shift</div><input id="maxContinuous" type="number" min="4" step="0.5"> <span class="badge">hours</span></div>
-        <div class="ruleCard"><div class="miniLabel">Max contracted OT</div><input id="maxOT" type="number" min="0" step="0.5"> <span class="badge">hours</span></div>
-        <div class="ruleCard"><label style="font-size:12px"><input id="twoOff" type="checkbox"> Require 2 consecutive days off</label></div>
-        <div class="ruleCard"><div class="miniLabel">Generated shift minimum</div><input id="minGeneratedShift" type="number" min="1" max="10" step="0.5"> <span class="badge">hours</span></div>
-        <div class="ruleCard"><div class="miniLabel">Allowed extra people per block</div><input id="flexOverstaff" type="number" min="0" max="2" step="1"> <span class="badge">people</span></div>
-        <div class="ruleCard"><div class="miniLabel">Weekly flex budget</div><input id="flexBudget" type="number" min="0" step="0.5"> <span class="badge">extra hrs</span></div>
-      </div>
+      <div class="rules"></div>
     </section>
 
     <section class="panel">
-      <h2>Staff needs &amp; constraints</h2>
-      <p class="hint">Availability and skill are hard rules. Full required coverage is mandatory. If the flexible optimiser gets stuck, the global solver can undo earlier assignments and search the whole week before declaring the rota impossible.</p>
+      <h2>Staff roster · baseline</h2>
+      <p class="hint">Only the staff names are used at this stage. All previous skill, availability, contract, manager and preference settings are ignored while we rebuild the rules from scratch.</p>
       <div class="actions" style="margin-bottom:9px"><button class="btn small" id="addStaff">+ Staff</button><span class="badge" id="staffSource"></span></div>
       <div class="staffList" id="staffList"></div>
     </section>
@@ -57,16 +53,12 @@
     <div class="metrics" id="metrics"></div>
     <div id="warnings"></div>
     <div class="rotaGrid" id="rotaGrid"></div>
-    <div class="footerNote">V2 Smart 0.5.3 keeps full required coverage as a hard publication gate. Normal flexible optimisation runs first; if that fails, a global feasibility solver searches the whole week with backtracking, prioritising scarce roles and Fri/Sat demand before easy weekday staffing.</div>
+    <div class="footerNote">V2 Baseline 0.6 deliberately applies no business or staff optimisation rules. It exists to prove the coverage requirement itself can be staffed before constraints are reintroduced one at a time.</div>
   </section>
 </div>
-<div class="build">V2 · Smart 0.5.3</div>
+<div class="build">V2 · Baseline 0.6</div>
 <script src="./smart.js?v=20260817-1006"></script>
-<script src="./business-rules.js?v=20260817-1111"></script>
-<script src="./day-copy.js?v=20260817-1030"></script>
 <script src="./export-fix.js?v=20260817-1048"></script>
-<script src="./flexible-optimizer-v2.js?v=20260817-1148"></script>
-<script src="./coverage-gate.js?v=20260817-1201"></script>
-<script src="./global-feasibility.js?v=20260817-1236"></script>
+<script src="./baseline-optimizer.js?v=20260817-1244"></script>
 </body>
 </html>
