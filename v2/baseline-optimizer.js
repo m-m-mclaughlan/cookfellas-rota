@@ -54,13 +54,18 @@
     return LEVELS.indexOf(level)>=LEVELS.indexOf(need);
   }
 
+  function availabilityOk(staff,position){
+    const v=staff.availableDays?.[position.day]||'full';
+    if(v==='none')return false;
+    if(v==='am')return position.end<=17*60;
+    if(v==='pm')return position.start>=17*60;
+    return true;
+  }
+
   function targetOf(staff){
     return staff.contractType==='contracted'?Math.max(0,Number(staff.targetHours)||0):0;
   }
 
-  // Contract targets are objectives, not hard caps. Being below target is costly,
-  // but avoidable overtime is much more costly than using an eligible zero-hours
-  // person once a contracted worker has reached target.
   function hourPenalty(staff,h){
     const target=targetOf(staff);
     if(target>0){
@@ -68,7 +73,6 @@
       const over=Math.max(0,h-target);
       return under*300 + over*1500;
     }
-    // Zero-hours staff, plus contracted entries with no target configured.
     return h*60;
   }
 
@@ -76,7 +80,7 @@
     const current=weeklyHours.get(staff.id)||0;
     let cost=hourPenalty(staff,current+.5)-hourPenalty(staff,current);
     const laneKey=`${position.area}|${position.role}`;
-    if((prevByLane.get(laneKey)||[]).includes(staff.id))cost-=5; // tie-break only
+    if((prevByLane.get(laneKey)||[]).includes(staff.id))cost-=5;
     return cost;
   }
 
@@ -87,13 +91,15 @@
     const enriched=positions.map((p,originalIndex)=>({
       ...p,
       originalIndex,
-      eligible:staff.map((s,staffIndex)=>({s,staffIndex})).filter(x=>skillOk(x.s,p))
+      eligible:staff.map((s,staffIndex)=>({s,staffIndex})).filter(x=>skillOk(x.s,p)&&availabilityOk(x.s,p))
     }));
 
     const impossible=enriched.find(p=>p.eligible.length===0);
-    if(impossible)return {ok:false,problem:`No eligible ${impossible.area==='bar'?'Bar FOH':impossible.role} staff exist for this required position.`};
+    if(impossible){
+      const role=impossible.area==='bar'?'Bar FOH':impossible.role;
+      return {ok:false,problem:`No available, skill-eligible ${role} staff exist for this required position.`};
+    }
 
-    // Most constrained positions first keeps the matching search small.
     enriched.sort((a,b)=>a.eligible.length-b.eligible.length||a.area.localeCompare(b.area)||a.role.localeCompare(b.role));
 
     const memo=new Map();
@@ -127,8 +133,8 @@
 
     const solved=dfs(0,0,false);
     if(!solved){
-      if(managerRequired)return {ok:false,problem:'Required staffing can be skill-matched, but no valid assignment also provides a manager on site at this opening/closing block.'};
-      return {ok:false,problem:'Required positions cannot all be skill-matched without double-booking somebody in the same half-hour.'};
+      if(managerRequired)return {ok:false,problem:'The available staff can cover the skills, but no valid assignment also provides an available manager at this opening/closing block.'};
+      return {ok:false,problem:'The available staff cannot cover all required positions without double-booking somebody in this half-hour.'};
     }
 
     const picked=new Map(solved.picks.map(x=>[x.originalIndex,x.staffId]));
@@ -183,21 +189,13 @@
     return map;
   }
 
-  function assignmentPenalty(state,pieces){
-    const hrs=hoursFromPieces(state,pieces);
-    return (state.staff||[]).reduce((sum,s)=>sum+hourPenalty(s,hrs.get(s.id)||0),0);
-  }
-
-  // Local weekly repair: once the first valid week exists, move individual
-  // half-hours when that improves the contract-target objective, while retaining
-  // skills, no double-booking and manager open/close cover.
   function rebalanceWeek(state,pieces){
     const staff=state.staff||[];
     const staffById=new Map(staff.map(s=>[s.id,s]));
     const grouped=new Map();
     for(const x of pieces){const k=blockKey(x);if(!grouped.has(k))grouped.set(k,[]);grouped.get(k).push(x)}
 
-    let hrs=hoursFromPieces(state,pieces);
+    const hrs=hoursFromPieces(state,pieces);
     let changed=true,passes=0;
     while(changed&&passes<12){
       changed=false;passes++;
@@ -210,7 +208,7 @@
 
         let bestId=null,bestDelta=0;
         for(const to of staff){
-          if(to.id===from.id||used.has(to.id)||!skillOk(to,x))continue;
+          if(to.id===from.id||used.has(to.id)||!skillOk(to,x)||!availabilityOk(to,x))continue;
           if(managerRequired&&from.isManager&&!otherManager&&!to.isManager)continue;
 
           const fromH=hrs.get(from.id)||0,toH=hrs.get(to.id)||0;
@@ -227,7 +225,7 @@
         }
       }
     }
-    return {pieces,hours:hrs,penalty:assignmentPenalty(state,pieces)};
+    return {pieces,hours:hrs};
   }
 
   function mergePieces(pieces){
@@ -257,10 +255,20 @@
       const open=toMin(site?.open),close=toMin(site?.close);
       if(open==null||close==null)continue;
       const dayPieces=pieces.filter(x=>x.day===day);
-      const openMgr=dayPieces.some(x=>x.start<=open&&x.end>=open+30&&staffById.get(x.staffId)?.isManager);
-      const closeMgr=dayPieces.some(x=>x.start<=close-30&&x.end>=close&&staffById.get(x.staffId)?.isManager);
-      if(dayPieces.some(x=>x.start===open)&&!openMgr)problems.push(`${day}: no manager at staffing start`);
-      if(dayPieces.some(x=>x.end===close)&&!closeMgr)problems.push(`${day}: no manager at close`);
+      const openMgr=dayPieces.some(x=>x.start<=open&&x.end>=open+30&&staffById.get(x.staffId)?.isManager&&availabilityOk(staffById.get(x.staffId),x));
+      const closeMgr=dayPieces.some(x=>x.start<=close-30&&x.end>=close&&staffById.get(x.staffId)?.isManager&&availabilityOk(staffById.get(x.staffId),x));
+      if(dayPieces.some(x=>x.start===open)&&!openMgr)problems.push(`${day}: no available manager at staffing start`);
+      if(dayPieces.some(x=>x.end===close)&&!closeMgr)problems.push(`${day}: no available manager at close`);
+    }
+    return problems;
+  }
+
+  function availabilityCheck(state,pieces){
+    const staffById=new Map((state.staff||[]).map(s=>[s.id,s]));
+    const problems=[];
+    for(const x of pieces){
+      const s=staffById.get(x.staffId);
+      if(s&&!availabilityOk(s,x))problems.push(`${x.day} ${pretty(x.start)}–${pretty(x.end)}: ${s.name} is unavailable`);
     }
     return problems;
   }
@@ -268,7 +276,7 @@
   function renderFailure(problem){
     if(download)download.disabled=true;
     const panel=document.getElementById('resultsPanel');panel.style.display='block';
-    document.getElementById('resultHint').textContent='No rota published. Coverage, skill eligibility and mandatory manager opening/closing cover are hard rules.';
+    document.getElementById('resultHint').textContent='No rota published. Coverage, skills, roster availability and mandatory manager opening/closing cover are hard rules.';
     document.getElementById('metrics').innerHTML='<div class="metric"><div class="k">Rota status</div><div class="v">INVALID</div></div>';
     document.getElementById('warnings').innerHTML=`<div class="warn"><strong>Core-rule failure:</strong> ${esc(problem)}</div>`;
     document.getElementById('rotaGrid').innerHTML='';
@@ -285,7 +293,7 @@
     const deficit=contracted.reduce((z,s)=>z+Math.max(0,targetOf(s)-(weeklyHours.get(s.id)||0)),0);
     const zeroUsed=(state.staff||[]).filter(s=>s.contractType!=='contracted'||targetOf(s)===0).reduce((z,s)=>z+(weeklyHours.get(s.id)||0),0);
 
-    document.getElementById('resultHint').textContent='Core mode: full coverage, skills and manager opening/closing cover are hard. Contract targets are balanced globally before avoidable overtime or zero-hours allocation.';
+    document.getElementById('resultHint').textContent='Core mode: coverage, skills, availability and manager opening/closing cover are hard. Contracted targets are balanced within those hard constraints.';
     document.getElementById('metrics').innerHTML=[
       ['Required labour',required.toFixed(1)+'h'],
       ['Unfilled coverage','0.0h'],
@@ -293,14 +301,15 @@
       ['Contract targets',contractedTarget.toFixed(1)+'h'],
       ['Contract deficit',deficit.toFixed(1)+'h'],
       ['Contract overtime',overtime.toFixed(1)+'h'],
-      ['Other / zero-hours',zeroUsed.toFixed(1)+'h']
+      ['Other / zero-hours',zeroUsed.toFixed(1)+'h'],
+      ['Active rule groups','4']
     ].map(([k,v])=>`<div class="metric"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
 
     const targetNotes=contracted.map(s=>{
       const used=weeklyHours.get(s.id)||0,target=targetOf(s),diff=used-target;
       return `${esc(s.name)} ${used.toFixed(1)} / ${target.toFixed(1)}h${Math.abs(diff)<.01?' ✓':diff>0?` (+${diff.toFixed(1)})`:` (${diff.toFixed(1)})`}`;
     }).join(' · ');
-    document.getElementById('warnings').innerHTML=`<div class="ok">✓ CORE RULES PASSED — every required half-hour is skill-covered and manager open/close cover is present.</div><div class="ok">Contracted: ${targetNotes||'no positive targets configured'}</div>`;
+    document.getElementById('warnings').innerHTML=`<div class="ok">✓ CORE RULES PASSED — every required half-hour is skill-covered, all roster availability is respected and manager open/close cover is present.</div><div class="ok">Contracted: ${targetNotes||'none configured'}</div>`;
 
     const grid=document.getElementById('rotaGrid');grid.innerHTML='';
     for(const day of DAYS){
@@ -324,8 +333,6 @@
   function generate(){
     const state=readState();
     if(!state?.coverage||!Array.isArray(state.staff)||!state.staff.length){alert('No staff roster or coverage requirements found.');return}
-    if(state.staff.length>30){alert('Core optimiser currently supports up to 30 staff.');return}
-
     const lanes=buildLanes(state),weeklyHours=new Map(),pieces=[];
     for(const day of DAYS){
       const result=scheduleDay(state,lanes,day,weeklyHours);
@@ -335,8 +342,8 @@
 
     const balanced=rebalanceWeek(state,pieces);
     const merged=mergePieces(balanced.pieces);
-    const managerProblems=managerCheck(state,merged);
-    if(managerProblems.length){renderFailure(managerProblems.join(' · '));return}
+    const problems=[...availabilityCheck(state,merged),...managerCheck(state,merged)];
+    if(problems.length){renderFailure(problems.join(' · '));return}
     renderSuccess(state,lanes,merged,balanced.hours);
   }
 
