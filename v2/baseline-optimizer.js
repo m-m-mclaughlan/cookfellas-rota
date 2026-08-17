@@ -10,8 +10,9 @@
 
   const toMin=t=>{if(!t)return null;const [h,m]=String(t).split(':').map(Number);return h*60+m};
   const pretty=m=>{const h=Math.floor(m/60),n=m%60,hh=h>12?h-12:h===0?12:h;return `${hh}${n?':'+String(n).padStart(2,'0'):''}`};
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const readState=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch{return null}};
+  const potsSegment=(day,t)=>day==='Sat'?(t<17*60?'sat-11-5':'sat-5-close'):'whole';
 
   function buildLanes(state){
     const lanes=[];
@@ -92,7 +93,10 @@
       ...p,
       originalIndex,
       eligible:staff.map((s,staffIndex)=>({s,staffIndex})).filter(x=>
-        skillOk(x.s,p)&&availabilityOk(x.s,p)&&(!p.lockedStaffId||x.s.id===p.lockedStaffId)
+        skillOk(x.s,p)&&
+        availabilityOk(x.s,p)&&
+        (!p.lockedStaffId||x.s.id===p.lockedStaffId)&&
+        !(p.forbiddenStaffIds||[]).includes(x.s.id)
       )
     }));
 
@@ -101,6 +105,9 @@
       const role=impossible.area==='bar'?'Bar FOH':impossible.role;
       if(impossible.role==='pots'&&impossible.lockedStaffId){
         return {ok:false,problem:'The person assigned to the full pots shift cannot cover this pots block under the current availability/skills.'};
+      }
+      if(impossible.role==='pots'&&impossible.day==='Sat'&&impossible.potsSegment==='sat-5-close'){
+        return {ok:false,problem:'Saturday requires a different person for the 5pm–close pots shift from the 11am–5pm pots shift.'};
       }
       return {ok:false,problem:`No available, skill-eligible ${role} staff exist for this required position.`};
     }
@@ -161,10 +168,16 @@
         const block=lane.blocks.find(b=>b.start===t);
         if(!block||block.need<=0)continue;
         for(let slot=0;slot<block.need;slot++){
-          const lockKey=`${lane.area}|${lane.role}|${slot}`;
+          const segment=lane.role==='pots'?potsSegment(day,t):null;
+          const lockKey=`${lane.area}|${lane.role}|${segment||'normal'}|${slot}`;
+          const saturdayEarlyPotsIds=day==='Sat'&&lane.role==='pots'&&segment==='sat-5-close'
+            ? [...potsLocks.entries()].filter(([k])=>k.includes('|pots|sat-11-5|')).map(([,id])=>id)
+            : [];
           positions.push({
             day,area:lane.area,role:lane.role,start:t,end:t+30,slot,
-            lockedStaffId:lane.role==='pots'?(potsLocks.get(lockKey)||null):null
+            potsSegment:segment,
+            lockedStaffId:lane.role==='pots'?(potsLocks.get(lockKey)||null):null,
+            forbiddenStaffIds:saturdayEarlyPotsIds
           });
         }
       }
@@ -176,7 +189,7 @@
       const nextByLane=new Map();
       for(const x of solved.assignment){
         if(x.role==='pots'){
-          const lockKey=`${x.area}|${x.role}|${x.slot}`;
+          const lockKey=`${x.area}|${x.role}|${x.potsSegment||'whole'}|${x.slot}`;
           if(!potsLocks.has(lockKey))potsLocks.set(lockKey,x.staffId);
         }
         pieces.push(x);
@@ -216,8 +229,6 @@
     while(changed&&passes<12){
       changed=false;passes++;
       for(const x of pieces){
-        // Pots is a whole-shift hard assignment. Never rebalance individual
-        // half-hours from it, otherwise one pots shift would be split between people.
         if(x.role==='pots')continue;
         const from=staffById.get(x.staffId);if(!from)continue;
         const block=grouped.get(blockKey(x))||[];
@@ -250,7 +261,8 @@
   function mergePieces(pieces){
     const groups=new Map();
     for(const x of pieces){
-      const key=`${x.day}|${x.staffId}|${x.area}|${x.role}`;
+      const segment=x.role==='pots'?(x.potsSegment||'whole'):'normal';
+      const key=`${x.day}|${x.staffId}|${x.area}|${x.role}|${segment}`;
       if(!groups.has(key))groups.set(key,[]);
       groups.get(key).push(x);
     }
@@ -296,7 +308,7 @@
     const groups=new Map();
     for(const x of pieces){
       if(x.role!=='pots')continue;
-      const key=`${x.day}|${x.area}|${x.slot??0}`;
+      const key=`${x.day}|${x.area}|${x.potsSegment||'whole'}|${x.slot??0}`;
       if(!groups.has(key))groups.set(key,new Set());
       groups.get(key).add(x.staffId);
     }
@@ -304,6 +316,9 @@
     for(const [key,ids] of groups){
       if(ids.size>1)problems.push(`${key}: pots shift is split between multiple people`);
     }
+    const satEarly=new Set(pieces.filter(x=>x.day==='Sat'&&x.role==='pots'&&x.potsSegment==='sat-11-5').map(x=>x.staffId));
+    const satLate=new Set(pieces.filter(x=>x.day==='Sat'&&x.role==='pots'&&x.potsSegment==='sat-5-close').map(x=>x.staffId));
+    for(const id of satEarly)if(satLate.has(id))problems.push('Saturday pots 11–5 and 5–close must be worked by two different people');
     return problems;
   }
 
@@ -327,7 +342,7 @@
     const deficit=contracted.reduce((z,s)=>z+Math.max(0,targetOf(s)-(weeklyHours.get(s.id)||0)),0);
     const zeroUsed=(state.staff||[]).filter(s=>s.contractType!=='contracted'||targetOf(s)===0).reduce((z,s)=>z+(weeklyHours.get(s.id)||0),0);
 
-    document.getElementById('resultHint').textContent='Core mode: coverage, skills, availability, whole-shift pots and manager opening/closing cover are hard. Contracted targets are balanced within those hard constraints.';
+    document.getElementById('resultHint').textContent='Core mode: coverage, skills, availability, whole-shift pots and manager opening/closing cover are hard. Saturday pots is split into 11–5 and 5–close with different people. Contracted targets are balanced within those hard constraints.';
     document.getElementById('metrics').innerHTML=[
       ['Required labour',required.toFixed(1)+'h'],
       ['Unfilled coverage','0.0h'],
@@ -343,7 +358,7 @@
       const used=weeklyHours.get(s.id)||0,target=targetOf(s),diff=used-target;
       return `${esc(s.name)} ${used.toFixed(1)} / ${target.toFixed(1)}h${Math.abs(diff)<.01?' ✓':diff>0?` (+${diff.toFixed(1)})`:` (${diff.toFixed(1)})`}`;
     }).join(' · ');
-    document.getElementById('warnings').innerHTML=`<div class="ok">✓ CORE RULES PASSED — every required half-hour is skill-covered, all roster availability is respected, each pots shift stays with one person and manager open/close cover is present.</div><div class="ok">Contracted: ${targetNotes||'none configured'}</div>`;
+    document.getElementById('warnings').innerHTML=`<div class="ok">✓ CORE RULES PASSED — every required half-hour is skill-covered, all roster availability is respected, each pots shift stays with one person, Saturday uses separate 11–5 and 5–close pots staff, and manager open/close cover is present.</div><div class="ok">Contracted: ${targetNotes||'none configured'}</div>`;
 
     const grid=document.getElementById('rotaGrid');grid.innerHTML='';
     for(const day of DAYS){
