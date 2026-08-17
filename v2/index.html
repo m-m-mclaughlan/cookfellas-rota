@@ -15,7 +15,7 @@
     <div>
       <div class="eyebrow">Cookfella's Bar &amp; Eatery · V2</div>
       <div class="title">Smart Rota</div>
-      <div class="sub">Core rebuild. Coverage, skills, manager opening/closing cover, roster availability, consecutive days off, whole-shift pots duties and balanced contracted-hour targets are active. Saturday pots is split between two people.</div>
+      <div class="sub">Core rebuild. Coverage, skills, manager opening/closing cover, roster availability, consecutive days off, whole-shift pots duties, shift-length limits and balanced contracted-hour targets are active. Saturday pots is split between two people.</div>
     </div>
     <div class="actions">
       <button class="btn" id="importLegacy">Import current V2 roster</button>
@@ -28,7 +28,7 @@
   <div class="grid">
     <section class="panel">
       <h2>Coverage requirements</h2>
-      <p class="hint">Every required half-hour must be staffed. Skill eligibility is hard: pots &lt; running &lt; floor, and Bar requires floor-trained staff. Pots duties are whole shifts. Saturday specifically requires one person on POTS 11–5 and a different person on POTS 5–close. At least one available manager must be on site at staffing start and at close. Mon–Thu from 9pm to close requires one floor-trained FOH person in Restaurant and one in Bar.</p>
+      <p class="hint">Every required half-hour must be staffed. Skill eligibility is hard: pots &lt; running &lt; floor, and Bar requires floor-trained staff. Pots duties are whole shifts. Saturday specifically requires one person on POTS 11–5 and a different person on POTS 5–close. The preferred maximum working day/continuous shift is 8.5 hours and the hard maximum is 10 hours. At least one available manager must be on site at staffing start and at close. Mon–Thu from 9pm to close requires one floor-trained FOH person in Restaurant and one in Bar.</p>
       <div class="daytabs" id="dayTabs"></div>
       <div class="hoursRow">
         <div class="field"><label>Staffing begins</label><input type="time" id="siteOpen"></div>
@@ -42,7 +42,7 @@
 
     <section class="panel">
       <h2>Staff roster</h2>
-      <p class="hint"><strong>Active now:</strong> skill level, manager status, contract type/hours, availability, whole-shift pots duties and a mandatory pair of consecutive days off. Fran &amp; Tyler are hard-linked to the same two days off. Sunday + Monday counts as a consecutive pair. <strong>Stored but inactive:</strong> Bar preference, preferred minimum shift, max workdays and wanted days.</p>
+      <p class="hint"><strong>Active now:</strong> skill level, manager status, contract type/hours, availability, whole-shift pots duties, 8.5h preferred / 10h hard shift-length limits and a mandatory pair of consecutive days off. Fran &amp; Tyler are hard-linked to the same two days off. Sunday + Monday counts as a consecutive pair. <strong>Stored but inactive:</strong> Bar preference, preferred minimum shift, max workdays and wanted days.</p>
       <div class="actions" style="margin-bottom:9px"><button class="btn small" id="addStaff">+ Staff</button><span class="badge" id="staffSource"></span></div>
       <div class="staffList" id="staffList"></div>
     </section>
@@ -54,14 +54,14 @@
     <div class="metrics" id="metrics"></div>
     <div id="warnings"></div>
     <div class="rotaGrid" id="rotaGrid"></div>
-    <div class="footerNote">V2 Core 0.10.1 keeps coverage, skills, roster availability, manager opening/closing cover, consecutive days off and whole-shift pots duties hard. Saturday has two separate pots duties: 11–5 and 5–close, and they must be worked by different people. The total Saturday pots labour remains unchanged. Exported Restaurant rotas continue to label POTS and RUNNING duties. Workday limits, split rules, shift-length preferences and Bar preference remain inactive.</div>
+    <div class="footerNote">V2 Core 0.11 keeps coverage, skills, roster availability, manager opening/closing cover, consecutive days off and whole-shift pots duties hard. Saturday has separate 11–5 and 5–close pots duties worked by different people. Shift length now targets a maximum of 8.5 hours per day/continuous run, with an absolute 10 hour ceiling so open-to-close 11+ hour shifts cannot be generated. Exported Restaurant rotas continue to label POTS and RUNNING duties. Minimum-shift, workday-count, split-gap and Bar-preference rules remain inactive.</div>
   </section>
 </div>
-<div class="build">V2 · Core 0.10.1</div>
+<div class="build">V2 · Core 0.11</div>
 <script src="./smart.js?v=20260817-1006"></script>
 <script src="./weekday-close-coverage.js?v=20260817-1302"></script>
 <script src="./export-fix.js?v=20260817-1352"></script>
-<script src="./baseline-optimizer.js?v=20260817-1408"></script>
+<script src="./baseline-optimizer.js?v=20260817-1418"></script>
 <script src="./two-days-off.js?v=20260817-1408"></script>
 </body>
 </html>
