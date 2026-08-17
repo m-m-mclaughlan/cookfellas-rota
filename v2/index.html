@@ -28,7 +28,7 @@
   <div class="grid">
     <section class="panel">
       <h2>Coverage requirements</h2>
-      <p class="hint">Every required half-hour must be staffed. Skill eligibility is hard: pots &lt; running &lt; floor, and Bar requires floor-trained staff. At least one manager must be on site at staffing start and at close.</p>
+      <p class="hint">Every required half-hour must be staffed. Skill eligibility is hard: pots &lt; running &lt; floor, and Bar requires floor-trained staff. At least one manager must be on site at staffing start and at close. Mon–Thu from 9pm to close requires one floor-trained FOH person in Restaurant and one in Bar.</p>
       <div class="daytabs" id="dayTabs"></div>
       <div class="hoursRow">
         <div class="field"><label>Staffing begins</label><input type="time" id="siteOpen"></div>
@@ -54,11 +54,12 @@
     <div class="metrics" id="metrics"></div>
     <div id="warnings"></div>
     <div class="rotaGrid" id="rotaGrid"></div>
-    <div class="footerNote">V2 Core 0.7 activates only three roster rule groups: skills, manager opening/closing cover and contracted-hour targets. Full coverage remains mandatory. Availability, workday limits, split rules, shift-length preferences and Bar preference are not yet applied.</div>
+    <div class="footerNote">V2 Core 0.7.1 activates skills, manager opening/closing cover and contracted-hour targets. Full coverage remains mandatory. Mon–Thu closing FOH demand reduces to one floor-trained person in each area from 9pm. Availability, workday limits, split rules, shift-length preferences and Bar preference are not yet applied.</div>
   </section>
 </div>
-<div class="build">V2 · Core 0.7</div>
+<div class="build">V2 · Core 0.7.1</div>
 <script src="./smart.js?v=20260817-1006"></script>
+<script src="./weekday-close-coverage.js?v=20260817-1302"></script>
 <script src="./export-fix.js?v=20260817-1048"></script>
 <script src="./baseline-optimizer.js?v=20260817-1255"></script>
 </body>
