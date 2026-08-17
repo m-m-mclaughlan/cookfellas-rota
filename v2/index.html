@@ -15,7 +15,7 @@
     <div>
       <div class="eyebrow">Cookfella's Bar &amp; Eatery · V2</div>
       <div class="title">Smart Rota</div>
-      <div class="sub">Core rebuild. Coverage, skills, manager opening/closing cover and balanced contracted-hour targets are active. Other roster settings remain editable but inactive.</div>
+      <div class="sub">Core rebuild. Coverage, skills, manager opening/closing cover, roster availability and balanced contracted-hour targets are active. Other roster settings remain editable but inactive.</div>
     </div>
     <div class="actions">
       <button class="btn" id="importLegacy">Import current V2 roster</button>
@@ -28,7 +28,7 @@
   <div class="grid">
     <section class="panel">
       <h2>Coverage requirements</h2>
-      <p class="hint">Every required half-hour must be staffed. Skill eligibility is hard: pots &lt; running &lt; floor, and Bar requires floor-trained staff. At least one manager must be on site at staffing start and at close. Mon–Thu from 9pm to close requires one floor-trained FOH person in Restaurant and one in Bar.</p>
+      <p class="hint">Every required half-hour must be staffed. Skill eligibility is hard: pots &lt; running &lt; floor, and Bar requires floor-trained staff. At least one available manager must be on site at staffing start and at close. Mon–Thu from 9pm to close requires one floor-trained FOH person in Restaurant and one in Bar.</p>
       <div class="daytabs" id="dayTabs"></div>
       <div class="hoursRow">
         <div class="field"><label>Staffing begins</label><input type="time" id="siteOpen"></div>
@@ -42,7 +42,7 @@
 
     <section class="panel">
       <h2>Staff roster</h2>
-      <p class="hint"><strong>Active now:</strong> skill level, manager status, contract type and contracted target hours. Contract targets are balanced across the full week and avoidable overtime is heavily penalised. <strong>Stored but inactive:</strong> Bar preference, preferred minimum shift, max workdays, wanted days and availability.</p>
+      <p class="hint"><strong>Active now:</strong> skill level, manager status, contract type/hours and availability. Availability buttons are hard rules: Full = all day, AM = until 5pm, PM = from 5pm, None = unavailable. <strong>Stored but inactive:</strong> Bar preference, preferred minimum shift, max workdays and wanted days.</p>
       <div class="actions" style="margin-bottom:9px"><button class="btn small" id="addStaff">+ Staff</button><span class="badge" id="staffSource"></span></div>
       <div class="staffList" id="staffList"></div>
     </section>
@@ -54,13 +54,13 @@
     <div class="metrics" id="metrics"></div>
     <div id="warnings"></div>
     <div class="rotaGrid" id="rotaGrid"></div>
-    <div class="footerNote">V2 Core 0.7.2 keeps full coverage, skills and manager opening/closing cover hard. Contracted targets are now balanced across the week before avoidable overtime or zero-hours allocation. Mon–Thu closing FOH demand is one floor-trained person in each area from 9pm. Availability, workday limits, split rules, shift-length preferences and Bar preference remain inactive.</div>
+    <div class="footerNote">V2 Core 0.8 keeps full coverage, skills, roster availability and manager opening/closing cover hard. Contracted targets are balanced inside those hard constraints. Mon–Thu closing FOH demand is one floor-trained person in each area from 9pm. Workday limits, split rules, shift-length preferences and Bar preference remain inactive.</div>
   </section>
 </div>
-<div class="build">V2 · Core 0.7.2</div>
+<div class="build">V2 · Core 0.8</div>
 <script src="./smart.js?v=20260817-1006"></script>
 <script src="./weekday-close-coverage.js?v=20260817-1302"></script>
 <script src="./export-fix.js?v=20260817-1048"></script>
-<script src="./baseline-optimizer.js?v=20260817-1321"></script>
+<script src="./baseline-optimizer.js?v=20260817-1332"></script>
 </body>
 </html>
