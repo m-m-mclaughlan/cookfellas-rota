@@ -3,14 +3,14 @@
 
   const KEY='cookfellas-smart-v2-config';
   const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const LEVELS=['pots','running','floor'];
   const button=document.getElementById('generate');
   const download=document.getElementById('download');
   if(!button)return;
 
   const toMin=t=>{if(!t)return null;const [h,m]=String(t).split(':').map(Number);return h*60+m};
   const pretty=m=>{const h=Math.floor(m/60),n=m%60,hh=h>12?h-12:h===0?12:h;return `${hh}${n?':'+String(n).padStart(2,'0'):''}`};
-  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
-  const hours=(a,b)=>(b-a)/60;
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const readState=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch{return null}};
 
   function buildLanes(state){
@@ -47,56 +47,115 @@
     return total;
   }
 
-  function scheduleDay(state,lanes,day,weeklyHours){
+  function skillOk(staff,position){
+    const level=LEVELS.includes(staff.level)?staff.level:'pots';
+    if(position.area==='bar')return level==='floor';
+    const need=position.role==='floor'?'floor':position.role==='running'?'running':'pots';
+    return LEVELS.indexOf(level)>=LEVELS.indexOf(need);
+  }
+
+  function contractedDeficit(staff,weeklyHours){
+    if(staff.contractType!=='contracted')return 0;
+    const target=Math.max(0,Number(staff.targetHours)||0);
+    if(!target)return 0;
+    return Math.max(0,target-(weeklyHours.get(staff.id)||0));
+  }
+
+  function candidateScore(staff,position,weeklyHours,prevByLane,managerRequired){
+    const laneKey=`${position.area}|${position.role}`;
+    const prev=new Set(prevByLane.get(laneKey)||[]);
+    const deficit=contractedDeficit(staff,weeklyHours);
+    let score=0;
+    if(deficit>0)score+=100000+deficit*100;
+    if(prev.has(staff.id))score+=15000;
+    if(managerRequired&&staff.isManager)score+=5000;
+    score-=(weeklyHours.get(staff.id)||0)*2;
+    return score;
+  }
+
+  function solveBlock(state,positions,weeklyHours,prevByLane,managerRequired){
     const staff=state.staff||[];
+    const enriched=positions.map((p,index)=>{
+      const eligible=staff.filter(s=>skillOk(s,p));
+      return {...p,index,eligible};
+    });
+
+    const impossible=enriched.find(p=>p.eligible.length===0);
+    if(impossible){
+      return {ok:false,problem:`No eligible ${impossible.area==='bar'?'Bar FOH':impossible.role} staff exist for this required position.`};
+    }
+
+    enriched.sort((a,b)=>a.eligible.length-b.eligible.length||a.area.localeCompare(b.area)||a.role.localeCompare(b.role));
+    const used=new Set();
+    const picked=new Map();
+
+    function managerStillPossible(from){
+      for(let i=from;i<enriched.length;i++){
+        if(enriched[i].eligible.some(s=>s.isManager&&!used.has(s.id)))return true;
+      }
+      return false;
+    }
+
+    function dfs(i,hasManager){
+      if(i===enriched.length)return !managerRequired||hasManager;
+      if(managerRequired&&!hasManager&&!managerStillPossible(i))return false;
+      const p=enriched[i];
+      const candidates=p.eligible
+        .filter(s=>!used.has(s.id))
+        .sort((a,b)=>candidateScore(b,p,weeklyHours,prevByLane,managerRequired)-candidateScore(a,p,weeklyHours,prevByLane,managerRequired)||String(a.name).localeCompare(String(b.name)));
+
+      for(const s of candidates){
+        used.add(s.id);picked.set(p.index,s.id);
+        if(dfs(i+1,hasManager||!!s.isManager))return true;
+        picked.delete(p.index);used.delete(s.id);
+      }
+      return false;
+    }
+
+    if(!dfs(0,false)){
+      if(managerRequired){
+        return {ok:false,problem:'Required staffing can be skill-matched, but no valid assignment also provides a manager on site at this opening/closing block.'};
+      }
+      return {ok:false,problem:'Required positions cannot all be skill-matched without double-booking somebody in the same half-hour.'};
+    }
+
+    return {ok:true,assignment:positions.map((p,index)=>({...p,staffId:picked.get(index)}))};
+  }
+
+  function scheduleDay(state,lanes,day,weeklyHours){
     const dayLanes=lanes.filter(l=>l.day===day);
+    const site=state.siteHours?.[day];
+    const open=toMin(site?.open),close=toMin(site?.close);
     const times=[...new Set(dayLanes.flatMap(l=>l.blocks.filter(b=>b.need>0).map(b=>b.start)))].sort((a,b)=>a-b);
     const pieces=[];
     const prevByLane=new Map();
 
     for(const t of times){
-      const active=dayLanes.map((lane,idx)=>({lane,idx,block:lane.blocks.find(b=>b.start===t)})).filter(x=>x.block&&x.block.need>0);
-      const demand=active.reduce((z,x)=>z+x.block.need,0);
-      if(demand>staff.length){
-        return {ok:false,problem:`${day} ${pretty(t)}–${pretty(t+30)} needs ${demand} people at once but only ${staff.length} are on the roster.`};
+      const positions=[];
+      for(const lane of dayLanes){
+        const block=lane.blocks.find(b=>b.start===t);
+        if(!block||block.need<=0)continue;
+        for(let slot=0;slot<block.need;slot++)positions.push({day,area:lane.area,role:lane.role,start:t,end:t+30,slot});
       }
 
-      const used=new Set();
-      const chosenByLane=new Map();
-
-      // Keep people on the same lane first. This is not a staffing constraint;
-      // it simply avoids unnecessary half-hour handovers in the baseline.
-      for(const x of active){
-        const key=`${x.lane.area}|${x.lane.role}`;
-        const prev=(prevByLane.get(key)||[]).filter(id=>staff.some(s=>s.id===id));
-        const keep=[];
-        for(const id of prev){
-          if(keep.length>=x.block.need)break;
-          if(!used.has(id)){keep.push(id);used.add(id)}
-        }
-        chosenByLane.set(key,keep);
+      if(positions.length>(state.staff||[]).length){
+        return {ok:false,problem:`${day} ${pretty(t)}–${pretty(t+30)} needs ${positions.length} people at once but only ${(state.staff||[]).length} are on the roster.`};
       }
 
-      // Fill every remaining required position from any person who is not
-      // already working somewhere else in this same half-hour.
-      for(const x of active){
-        const key=`${x.lane.area}|${x.lane.role}`;
-        const chosen=chosenByLane.get(key)||[];
-        while(chosen.length<x.block.need){
-          const candidates=staff.filter(s=>!used.has(s.id)).sort((a,b)=>(weeklyHours.get(a.id)||0)-(weeklyHours.get(b.id)||0)||String(a.name).localeCompare(String(b.name)));
-          const s=candidates[0];
-          if(!s)return {ok:false,problem:`${day} ${pretty(t)}–${pretty(t+30)} could not be assigned without double-booking somebody.`};
-          chosen.push(s.id);used.add(s.id);
-        }
-        chosenByLane.set(key,chosen);
-        for(const id of chosen){
-          pieces.push({day,area:x.lane.area,role:x.lane.role,start:t,end:t+30,staffId:id});
-          weeklyHours.set(id,(weeklyHours.get(id)||0)+.5);
-        }
-      }
+      const managerRequired=(t===open)||(t+30===close);
+      const solved=solveBlock(state,positions,weeklyHours,prevByLane,managerRequired);
+      if(!solved.ok)return {ok:false,problem:`${day} ${pretty(t)}–${pretty(t+30)}: ${solved.problem}`};
 
+      const nextByLane=new Map();
+      for(const x of solved.assignment){
+        pieces.push(x);
+        weeklyHours.set(x.staffId,(weeklyHours.get(x.staffId)||0)+.5);
+        const key=`${x.area}|${x.role}`;
+        if(!nextByLane.has(key))nextByLane.set(key,[]);
+        nextByLane.get(key).push(x.staffId);
+      }
       prevByLane.clear();
-      for(const [key,ids] of chosenByLane)prevByLane.set(key,ids.slice());
+      for(const [key,ids] of nextByLane)prevByLane.set(key,ids);
     }
     return {ok:true,pieces};
   }
@@ -120,28 +179,56 @@
     return out.sort((a,b)=>DAYS.indexOf(a.day)-DAYS.indexOf(b.day)||a.start-b.start||a.area.localeCompare(b.area));
   }
 
+  function managerCheck(state,pieces){
+    const staffById=new Map((state.staff||[]).map(s=>[s.id,s]));
+    const problems=[];
+    for(const day of DAYS){
+      const site=state.siteHours?.[day];
+      const open=toMin(site?.open),close=toMin(site?.close);
+      if(open==null||close==null)continue;
+      const dayPieces=pieces.filter(x=>x.day===day);
+      const openMgr=dayPieces.some(x=>x.start<=open&&x.end>=open+30&&staffById.get(x.staffId)?.isManager);
+      const closeMgr=dayPieces.some(x=>x.start<=close-30&&x.end>=close&&staffById.get(x.staffId)?.isManager);
+      if(dayPieces.some(x=>x.start===open)&&!openMgr)problems.push(`${day}: no manager at staffing start`);
+      if(dayPieces.some(x=>x.end===close)&&!closeMgr)problems.push(`${day}: no manager at close`);
+    }
+    return problems;
+  }
+
   function renderFailure(problem){
     if(download)download.disabled=true;
-    const panel=document.getElementById('resultsPanel');
-    panel.style.display='block';
-    document.getElementById('resultHint').textContent='Baseline could not satisfy coverage even with all business and staff constraints removed.';
-    document.getElementById('metrics').innerHTML='<div class="metric"><div class="k">Rota status</div><div class="v">IMPOSSIBLE</div></div>';
-    document.getElementById('warnings').innerHTML=`<div class="warn"><strong>Coverage-only failure:</strong> ${esc(problem)}</div>`;
+    const panel=document.getElementById('resultsPanel');panel.style.display='block';
+    document.getElementById('resultHint').textContent='No rota published. Coverage, skill eligibility and mandatory manager opening/closing cover are active hard rules.';
+    document.getElementById('metrics').innerHTML='<div class="metric"><div class="k">Rota status</div><div class="v">INVALID</div></div>';
+    document.getElementById('warnings').innerHTML=`<div class="warn"><strong>Core-rule failure:</strong> ${esc(problem)}</div>`;
     document.getElementById('rotaGrid').innerHTML='';
     panel.scrollIntoView({behavior:'smooth',block:'start'});
   }
 
-  function renderSuccess(state,lanes,assign){
+  function renderSuccess(state,lanes,assign,weeklyHours){
     const panel=document.getElementById('resultsPanel');panel.style.display='block';
     const required=requiredHours(lanes);
-    document.getElementById('resultHint').textContent='Baseline mode: coverage only. Skills, availability, contracts, manager rules, workday limits, split rules and preferences are not being applied.';
+    const contracted=(state.staff||[]).filter(s=>s.contractType==='contracted');
+    const contractedUsed=contracted.reduce((z,s)=>z+(weeklyHours.get(s.id)||0),0);
+    const contractedTarget=contracted.reduce((z,s)=>z+(Math.max(0,Number(s.targetHours)||0)),0);
+    const zeroUsed=(state.staff||[]).filter(s=>s.contractType!=='contracted').reduce((z,s)=>z+(weeklyHours.get(s.id)||0),0);
+    const managerProblems=managerCheck(state,assign);
+
+    document.getElementById('resultHint').textContent='Core mode: full coverage, skills and manager opening/closing cover are enforced. Contracted staff are prioritised toward their target hours. Other roster constraints remain inactive.';
     document.getElementById('metrics').innerHTML=[
       ['Required labour',required.toFixed(1)+'h'],
-      ['Scheduled labour',required.toFixed(1)+'h'],
       ['Unfilled coverage','0.0h'],
-      ['Active constraints','0']
+      ['Contracted used',contractedUsed.toFixed(1)+'h'],
+      ['Contract targets',contractedTarget.toFixed(1)+'h'],
+      ['Zero-hours used',zeroUsed.toFixed(1)+'h'],
+      ['Active rule groups','3']
     ].map(([k,v])=>`<div class="metric"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
-    document.getElementById('warnings').innerHTML='<div class="ok">✓ BASELINE PASSED — every required half-hour block is staffed. No business/staff optimisation constraints were applied.</div>';
+
+    const targetNotes=contracted.map(s=>{
+      const used=weeklyHours.get(s.id)||0,target=Math.max(0,Number(s.targetHours)||0);
+      return `${esc(s.name)} ${used.toFixed(1)}${target?` / ${target.toFixed(1)}h`:'h'}`;
+    }).join(' · ');
+    document.getElementById('warnings').innerHTML=`<div class="ok">✓ CORE RULES PASSED — every required half-hour is skill-covered and manager open/close cover is present.</div>${managerProblems.map(x=>`<div class="warn">⚠ ${esc(x)}</div>`).join('')}<div class="ok">Contracted: ${targetNotes||'none configured'}</div>`;
 
     const grid=document.getElementById('rotaGrid');grid.innerHTML='';
     for(const day of DAYS){
@@ -153,7 +240,7 @@
         for(const x of arr){
           const s=state.staff.find(q=>q.id===x.staffId);
           const role=x.role==='bar'?'Bar FOH':x.role;
-          col.insertAdjacentHTML('beforeend',`<div class="shift ${area==='bar'?'bar':''}"><div class="time">${pretty(x.start)}–${pretty(x.end)}</div><div class="who">${esc(s?.name||'Staff')}</div><div class="role">${esc(role)}</div></div>`);
+          col.insertAdjacentHTML('beforeend',`<div class="shift ${area==='bar'?'bar':''}"><div class="time">${pretty(x.start)}–${pretty(x.end)}</div><div class="who">${esc(s?.name||'Staff')}${s?.isManager?' · MGR':''}</div><div class="role">${esc(role)}</div></div>`);
         }
       }
       grid.appendChild(col);
@@ -171,7 +258,10 @@
       if(!result.ok){renderFailure(result.problem);return}
       pieces.push(...result.pieces);
     }
-    renderSuccess(state,lanes,mergePieces(pieces));
+    const merged=mergePieces(pieces);
+    const managerProblems=managerCheck(state,merged);
+    if(managerProblems.length){renderFailure(managerProblems.join(' · '));return}
+    renderSuccess(state,lanes,merged,weeklyHours);
   }
 
   button.onclick=generate;
