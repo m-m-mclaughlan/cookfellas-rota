@@ -3,68 +3,21 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Cookfella's Bar & Eatery — Rota V2</title>
+<title>Cookfella's Smart Rota V2</title>
 <style>
-  html, body { margin: 0; min-height: 100%; background: #16211B; }
-  #boot { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #9AA79C; text-align: center; padding: 40px; }
+:root{--bg:#16211B;--panel:#1d2b24;--panel2:#24342c;--cream:#EFEBE2;--muted:#9AA79C;--gold:#C9A24B;--green:#6FAE8C;--red:#C98A6B;--line:#37453A;--ink:#16211B}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--cream);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.app{max-width:1500px;margin:auto;padding:16px}.top{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px}.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);font-weight:800}.title{font:700 30px/1.05 Georgia,serif;margin:4px 0}.sub{color:var(--muted);font-size:13px;max-width:720px}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{appearance:none;border:1px solid var(--line);background:transparent;color:var(--cream);border-radius:8px;padding:9px 12px;font-weight:700;font-size:13px;cursor:pointer}.btn:hover{filter:brightness(1.15)}.btn.primary{background:var(--gold);border-color:var(--gold);color:var(--ink)}.btn.small{padding:6px 8px;font-size:12px}.badge{display:inline-block;padding:3px 7px;border-radius:99px;border:1px solid var(--line);font-size:11px;color:var(--muted)}.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,.75fr);gap:14px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}.panel h2{font:700 18px Georgia,serif;margin:0 0 4px}.hint{font-size:12px;color:var(--muted);margin:0 0 12px}.daytabs{display:flex;gap:5px;overflow:auto;padding-bottom:8px}.daytab{min-width:46px;border:1px solid var(--line);background:var(--panel2);color:var(--cream);padding:7px;border-radius:7px;font-weight:700}.daytab.active{background:var(--gold);color:var(--ink);border-color:var(--gold)}.hoursRow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:5px 0 14px}.field label,.miniLabel{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}.field input,.req input,.req select,.staffRow input,.staffRow select{width:100%;background:#111b16;color:var(--cream);border:1px solid var(--line);border-radius:7px;padding:8px;font-size:13px}.areaHead{display:flex;justify-content:space-between;align-items:center;margin-top:12px}.areaTitle{font-weight:800}.reqs{display:flex;flex-direction:column;gap:7px;margin-top:7px}.req{display:grid;grid-template-columns:88px 1fr 1fr 60px 32px;gap:6px;align-items:center}.req .remove,.icon{width:32px;height:32px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}.rules{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}.ruleCard{background:var(--panel2);padding:9px;border-radius:8px;border:1px solid var(--line)}.ruleCard input{width:70px;background:#111b16;color:var(--cream);border:1px solid var(--line);border-radius:6px;padding:5px}.staffList{display:flex;flex-direction:column;gap:7px;max-height:660px;overflow:auto;padding-right:2px}.staffRow{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px}.staffTop{display:grid;grid-template-columns:minmax(95px,1.2fr) 95px 46px 46px 100px 70px 32px;gap:6px;align-items:center}.checkWrap{text-align:center;font-size:10px;color:var(--muted)}.checkWrap input{width:auto}.avail{display:flex;gap:4px;margin-top:7px;flex-wrap:wrap}.avail button{width:34px;height:27px;border-radius:6px;border:1px solid var(--line);background:#111b16;color:var(--cream);font-size:11px;font-weight:700}.avail button.full{background:#6f855633}.avail button.am{background:linear-gradient(90deg,#C9A24B55 0 50%,#111b16 50%)}.avail button.pm{background:linear-gradient(90deg,#111b16 0 50%,#C9A24B55 50%)}.avail button.none{opacity:.35}.staffMeta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:7px}.staffMeta label{font-size:10px;color:var(--muted)}.staffMeta input{margin-top:3px}.results{margin-top:14px}.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin:10px 0}.metric{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px}.metric .k{font-size:10px;color:var(--muted)}.metric .v{font:700 18px Georgia,serif;margin-top:2px}.warn{border:1px solid #805741;background:#3b291f;padding:9px;border-radius:8px;color:#ffd9cb;font-size:12px;margin:7px 0}.ok{border:1px solid #3b6a54;background:#18352a;padding:9px;border-radius:8px;color:#cce9d9;font-size:12px;margin:7px 0}.rotaGrid{display:grid;grid-template-columns:repeat(7,minmax(155px,1fr));gap:7px;overflow:auto}.dayResult{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px;min-width:155px}.dayResult h3{margin:0 0 7px;font-size:13px;color:var(--gold)}.areaLabel{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:7px 0 3px}.shift{background:#111b16;border-left:3px solid var(--green);border-radius:6px;padding:6px;margin:4px 0}.shift.bar{border-left-color:var(--gold)}.shift.unfilled{border-left-color:var(--red)}.shift .time{font-weight:800;font-size:12px}.shift .who{font-size:12px;margin-top:2px}.shift .role{font-size:10px;color:var(--muted)}.footerNote{font-size:11px;color:var(--muted);margin-top:10px}.build{position:fixed;right:8px;bottom:6px;background:#6B4F1D;color:white;font-size:10px;padding:3px 6px;border-radius:4px;z-index:10}@media(max-width:1000px){.grid{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(3,1fr)}.staffList{max-height:none}.rotaGrid{grid-template-columns:repeat(7,180px)}}@media(max-width:650px){.app{padding:10px}.title{font-size:25px}.req{grid-template-columns:78px 1fr 1fr 52px 30px}.rules{grid-template-columns:1fr}.staffTop{grid-template-columns:1fr 86px 42px 42px}.staffTop .contractType,.staffTop .target,.staffTop .removeStaff{grid-row:2}.staffTop .contractType{grid-column:1/2}.staffTop .target{grid-column:2/4}.staffTop .removeStaff{grid-column:4}.staffMeta{grid-template-columns:1fr 1fr}.metrics{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
-<div id="boot">Loading rota V2…</div>
-<script src="../patches.js?v=20260817-0209"></script>
-<script src="../contract-topup.js?v=20260817-0209"></script>
-<script src="../contract-cap.js?v=20260817-0209"></script>
-<script src="../off-plan.js?v=20260817-0209"></script>
-<script src="../availability-guard.js?v=20260817-0209"></script>
-<script src="../wlb-optimizer.js?v=20260817-0209"></script>
-<script src="../balanced-template.js?v=20260817-0209"></script>
-<script src="../fran-friday.js?v=20260817-0209"></script>
-<script src="../saturday-foh.js?v=20260817-0209"></script>
-<script src="../saturday-bar-guard.js?v=20260817-0209"></script>
-<script src="../contract-experiment.js?v=20260817-0209"></script>
-<script src="../bar-floor-guard.js?v=20260817-0209"></script>
-<script src="../saturday-final-guard.js?v=20260817-0209"></script>
-<script src="../short-shift-guard.js?v=20260817-0209"></script>
-<script src="../clean-shift-labels.js?v=20260817-0209"></script>
-<script>
-(async function () {
-  try {
-    const response = await fetch('../app-original.html?v=20260817-0209', { cache: 'no-store' });
-    if (!response.ok) throw new Error('Could not load rota app');
-    let html = await response.text();
-    if (typeof window.applyCookfellasPatches !== 'function') throw new Error('Rota patches failed to load');
-    if (typeof window.applyContractTopupPatch !== 'function') throw new Error('Contract top-up patch failed to load');
-    if (typeof window.applyContractCapPatch !== 'function') throw new Error('Contract cap patch failed to load');
-    if (typeof window.applyContractOffPlanPatch !== 'function') throw new Error('Contract off-plan patch failed to load');
-    if (typeof window.applyAvailabilityGuardPatch !== 'function') throw new Error('Availability guard patch failed to load');
-    html = window.applyCookfellasPatches(html);
-    html = window.applyContractTopupPatch(html);
-    html = window.applyContractCapPatch(html);
-    html = window.applyContractOffPlanPatch(html);
-    html = window.applyAvailabilityGuardPatch(html);
-    if (typeof window.applyWlbOptimizerPatch === 'function') html = window.applyWlbOptimizerPatch(html);
-    if (typeof window.applyBalancedTemplatePatch === 'function') html = window.applyBalancedTemplatePatch(html);
-    if (typeof window.applyFranFridayPatch === 'function') html = window.applyFranFridayPatch(html);
-    if (typeof window.applySaturdayFohPatch === 'function') html = window.applySaturdayFohPatch(html);
-    if (typeof window.applySaturdayBarGuardPatch === 'function') html = window.applySaturdayBarGuardPatch(html);
-    if (typeof window.applyContractExperimentPatch === 'function') html = window.applyContractExperimentPatch(html);
-    if (typeof window.applyBarFloorGuardPatch === 'function') html = window.applyBarFloorGuardPatch(html);
-    if (typeof window.applySaturdayFinalGuardPatch === 'function') html = window.applySaturdayFinalGuardPatch(html);
-    if (typeof window.applyShortShiftGuardPatch === 'function') html = window.applyShortShiftGuardPatch(html);
-    if (typeof window.applyCleanShiftLabelsPatch === 'function') html = window.applyCleanShiftLabelsPatch(html);
-
-    // V2 must have completely separate persisted rota data from the live V1 app.
-    html = html.split('cookfellas-rota-v1').join('cookfellas-rota-v2');
-
-    html = html.replace('</body>', '<div style="position:fixed;right:8px;bottom:6px;z-index:9999;font:10px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#fff;background:#6B4F1D;padding:3px 6px;border-radius:4px;pointer-events:none">V2 · Baseline 02:09</div></body>');
-    document.open();
-    document.write(html);
-    document.close();
-  } catch (error) {
-    console.error(error);
-    document.getElementById('boot').textContent = 'Rota V2 failed to load. Please refresh the page.';
-  }
-})();
-</script>
+<div class="app">
+  <div class="top"><div><div class="eyebrow">Cookfella's Bar & Eatery · V2</div><div class="title">Smart Rota</div><div class="sub">Define the coverage the business actually needs. V2 creates the shifts, then assigns staff around availability, skills, contracts and work-life rules.</div></div><div class="actions"><button class="btn" id="importLegacy">Import current V2 roster</button><button class="btn" id="resetCoverage">Reset coverage</button><button class="btn primary" id="generate">Generate smart rota</button><button class="btn" id="download" disabled>Download rota</button></div></div>
+  <div class="grid">
+    <section class="panel"><h2>Coverage requirements</h2><p class="hint">These are the rules that matter. V2 generates shifts from them instead of starting from fixed shift templates.</p><div class="daytabs" id="dayTabs"></div><div class="hoursRow"><div class="field"><label>Site opens</label><input type="time" id="siteOpen"></div><div class="field"><label>Site closes</label><input type="time" id="siteClose"></div></div><div id="coverageEditor"></div><div class="rules"><div class="ruleCard"><div class="miniLabel">Minimum split gap</div><input id="splitGap" type="number" min="0" step="0.5"> <span class="badge">hours</span></div><div class="ruleCard"><div class="miniLabel">Max continuous shift</div><input id="maxContinuous" type="number" min="4" step="0.5"> <span class="badge">hours</span></div><div class="ruleCard"><div class="miniLabel">Max contracted OT</div><input id="maxOT" type="number" min="0" step="0.5"> <span class="badge">hours</span></div><div class="ruleCard"><label style="font-size:12px"><input id="twoOff" type="checkbox"> Require 2 consecutive days off</label></div></div></section>
+    <section class="panel"><h2>Staff needs & constraints</h2><p class="hint">Availability and skill are hard rules. Contracts, fewer workdays, area preference and short-shift preferences influence the optimiser.</p><div class="actions" style="margin-bottom:9px"><button class="btn small" id="addStaff">+ Staff</button><span class="badge" id="staffSource"></span></div><div class="staffList" id="staffList"></div></section>
+  </div>
+  <section class="panel results" id="resultsPanel" style="display:none"><h2>Generated rota</h2><p class="hint" id="resultHint"></p><div class="metrics" id="metrics"></div><div id="warnings"></div><div class="rotaGrid" id="rotaGrid"></div><div class="footerNote">V2 Smart 0.1 uses a deterministic coverage-first heuristic. It never adds paid hours simply to make a short shift look nicer; every generated shift traces back to a coverage requirement.</div></section>
+</div>
+<div class="build">V2 · Smart 0.1</div>
+<script src="./smart.js?v=20260817-1006"></script>
 </body>
 </html>
