@@ -25,7 +25,7 @@
   <div class="grid">
     <section class="panel">
       <h2>Coverage requirements</h2>
-      <p class="hint">These are the rules that matter. V2 generates shifts from them instead of starting from fixed shift templates.</p>
+      <p class="hint">Requirement times are demand windows, not fixed shift boundaries. Smart 0.5 can build longer shifts across them — for example 11:30–8 or 11:30–9 — while still checking coverage every 30 minutes.</p>
       <div class="daytabs" id="dayTabs"></div>
       <div class="hoursRow">
         <div class="field"><label>Staffing begins / manager open</label><input type="time" id="siteOpen"></div>
@@ -37,12 +37,15 @@
         <div class="ruleCard"><div class="miniLabel">Max continuous shift</div><input id="maxContinuous" type="number" min="4" step="0.5"> <span class="badge">hours</span></div>
         <div class="ruleCard"><div class="miniLabel">Max contracted OT</div><input id="maxOT" type="number" min="0" step="0.5"> <span class="badge">hours</span></div>
         <div class="ruleCard"><label style="font-size:12px"><input id="twoOff" type="checkbox"> Require 2 consecutive days off</label></div>
+        <div class="ruleCard"><div class="miniLabel">Generated shift minimum</div><input id="minGeneratedShift" type="number" min="1" max="10" step="0.5"> <span class="badge">hours</span></div>
+        <div class="ruleCard"><div class="miniLabel">Allowed extra people per block</div><input id="flexOverstaff" type="number" min="0" max="2" step="1"> <span class="badge">people</span></div>
+        <div class="ruleCard"><div class="miniLabel">Weekly flex budget</div><input id="flexBudget" type="number" min="0" step="0.5"> <span class="badge">extra hrs</span></div>
       </div>
     </section>
 
     <section class="panel">
       <h2>Staff needs &amp; constraints</h2>
-      <p class="hint">Availability and skill are hard rules. Contracted hours are preferred before zero-hours, while useful manager presence is protected at opening, closing and key Fri/Sat periods.</p>
+      <p class="hint">Availability and skill are hard rules. Required coverage comes first. Contracted hours are preferred before zero-hours, while useful manager presence is protected at opening, closing and key Fri/Sat periods.</p>
       <div class="actions" style="margin-bottom:9px"><button class="btn small" id="addStaff">+ Staff</button><span class="badge" id="staffSource"></span></div>
       <div class="staffList" id="staffList"></div>
     </section>
@@ -54,16 +57,14 @@
     <div class="metrics" id="metrics"></div>
     <div id="warnings"></div>
     <div class="rotaGrid" id="rotaGrid"></div>
-    <div class="footerNote">V2 Smart 0.4.4 uses scarcity-first assignment plus bundled multi-step repair. Required coverage comes first; Fri/Sat manager presence and Saturday 5–9 for Mark, Fran and Tyler are protected while contracted hours are used ahead of zero-hours wherever valid.</div>
+    <div class="footerNote">V2 Smart 0.5 treats coverage as a half-hour demand curve rather than a set of fixed shifts. It can build longer overlapping shifts across requirement boundaries, use a controlled flex budget where that improves the rota, prioritise contracted hours over zero-hours, and preserve manager cover at opening, closing and important Fri/Sat periods.</div>
   </section>
 </div>
-<div class="build">V2 · Smart 0.4.4</div>
+<div class="build">V2 · Smart 0.5</div>
 <script src="./smart.js?v=20260817-1006"></script>
 <script src="./business-rules.js?v=20260817-1111"></script>
 <script src="./day-copy.js?v=20260817-1030"></script>
 <script src="./export-fix.js?v=20260817-1048"></script>
-<script src="./optimizer-v2.js?v=20260817-1100"></script>
-<script src="./efficiency-pass.js?v=20260817-1120"></script>
-<script src="./augmenting-repair.js?v=20260817-1140"></script>
+<script src="./flexible-optimizer.js?v=20260817-1138"></script>
 </body>
 </html>
