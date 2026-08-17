@@ -18,7 +18,7 @@
       <button class="btn" id="importLegacy">Import current V2 roster</button>
       <button class="btn" id="resetCoverage">Reset coverage</button>
       <button class="btn primary" id="generate">Generate smart rota</button>
-      <button class="btn" id="download" disabled>Download rota</button>
+      <button class="btn" id="download" disabled>Save rota</button>
     </div>
   </div>
 
@@ -54,12 +54,13 @@
     <div class="metrics" id="metrics"></div>
     <div id="warnings"></div>
     <div class="rotaGrid" id="rotaGrid"></div>
-    <div class="footerNote">V2 Smart 0.3.1 uses a deterministic coverage-first heuristic. It never adds paid hours simply to make a short shift look nicer; every generated shift traces back to a coverage requirement.</div>
+    <div class="footerNote">V2 Smart 0.3.2 uses a deterministic coverage-first heuristic. It never adds paid hours simply to make a short shift look nicer; every generated shift traces back to a coverage requirement.</div>
   </section>
 </div>
-<div class="build">V2 · Smart 0.3.1</div>
+<div class="build">V2 · Smart 0.3.2</div>
 <script src="./smart.js?v=20260817-1006"></script>
 <script src="./business-rules.js?v=20260817-1038"></script>
 <script src="./day-copy.js?v=20260817-1030"></script>
+<script src="./export-fix.js?v=20260817-1041"></script>
 </body>
 </html>
