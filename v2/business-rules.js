@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const KEY='cookfellas-smart-v2-config';
-  const VERSION=3;
+  const VERSION=4;
   const NOON='12:00';
   const STARTS={Mon:'11:30',Tue:'11:30',Wed:'11:30',Thu:'11:30',Fri:'11:30',Sat:'11:00',Sun:'11:00'};
 
@@ -12,12 +12,20 @@
     const start=STARTS[day]||'11:30';
     const noon=12*60;
     const primaryRole=area==='bar'?'bar':'floor';
+    const source=rows||[];
     const out=[];
+
+    // Re-use the existing canonical opening-row ID where possible. This is
+    // important: creating a new ID on every pass made migrate() report a
+    // change forever, which intercepted Generate and caused a reload loop.
+    const existingOpening=source.find(r=>
+      r.role===primaryRole&&r.start===start&&r.end===NOON&&Number(r.count)===1
+    );
 
     // Before noon there is exactly one setup/opening person in each area.
     // Any other requirement begins no earlier than 12:00. Post-noon counts
     // are preserved exactly as the user entered them.
-    for(const r0 of rows||[]){
+    for(const r0 of source){
       const r={...r0};
       const a=mins(r.start),b=mins(r.end);
       if(a==null||b==null||b<=a){out.push(r);continue}
@@ -26,7 +34,7 @@
       out.push(r)
     }
 
-    out.unshift({id:id(),role:primaryRole,start,end:NOON,count:1});
+    out.unshift({id:existingOpening?.id||id(),role:primaryRole,start,end:NOON,count:1});
     return out
   }
 
@@ -40,7 +48,7 @@
     for(const day of Object.keys(STARTS)){
       const c=s.coverage[day];if(!c)continue;
       const start=STARTS[day];
-      if(!s.siteHours[day])s.siteHours[day]={open:start,close:'22:30'};
+      if(!s.siteHours[day]){s.siteHours[day]={open:start,close:'22:30'};changed=true}
       if(s.siteHours[day].open!==start){s.siteHours[day].open=start;changed=true}
 
       const beforeR=JSON.stringify(c.restaurant||[]),beforeB=JSON.stringify(c.bar||[]);
@@ -55,8 +63,8 @@
   }
 
   function reloadAfterMigration(){
-    if(migrate()&&sessionStorage.getItem('cookfellas-v2-opening-v3')!=='1'){
-      sessionStorage.setItem('cookfellas-v2-opening-v3','1');
+    if(migrate()&&sessionStorage.getItem('cookfellas-v2-opening-v4')!=='1'){
+      sessionStorage.setItem('cookfellas-v2-opening-v4','1');
       location.reload();
       return true
     }
@@ -71,30 +79,31 @@
     if(label)label.textContent='Staffing begins / manager open';
   }
   const coverageHint=document.querySelector('.panel .hint');
-  if(coverageHint){
-    coverageHint.insertAdjacentHTML('afterend','<div class="ok" style="margin-top:-4px">Opening rule: 1 person in Restaurant + 1 person in Bar before 12:00. Staffing starts 11:30 Mon–Fri, 11:00 Sat–Sun.</div>');
+  if(coverageHint&&!document.getElementById('openingRuleNote')){
+    coverageHint.insertAdjacentHTML('afterend','<div id="openingRuleNote" class="ok" style="margin-top:-4px">Opening rule: 1 person in Restaurant + 1 person in Bar before 12:00. Staffing starts 11:30 Mon–Fri, 11:00 Sat–Sun.</div>');
   }
 
-  // Reset Coverage recreates the original Smart 0.1 defaults, so normalise
-  // them immediately afterwards and reload once with the business rule applied.
+  // Reset Coverage recreates the starter defaults. Re-normalise immediately
+  // afterwards so the fixed business opening rule remains intact.
   const reset=document.getElementById('resetCoverage');
   if(reset){
     reset.addEventListener('click',()=>{
       setTimeout(()=>{
-        sessionStorage.removeItem('cookfellas-v2-opening-v3');
+        sessionStorage.removeItem('cookfellas-v2-opening-v4');
         if(migrate())location.reload();
       },0)
     });
   }
 
   // If a pre-noon requirement is manually edited later, enforce the hard
-  // opening rule before generating rather than silently producing a bad rota.
+  // opening rule once before generation. With the canonical ID preserved,
+  // a normal Generate click now passes straight through without reloading.
   const generate=document.getElementById('generate');
   if(generate){
     generate.addEventListener('click',e=>{
       if(migrate()){
         e.stopImmediatePropagation();
-        sessionStorage.removeItem('cookfellas-v2-opening-v3');
+        sessionStorage.removeItem('cookfellas-v2-opening-v4');
         location.reload();
       }
     },true)
