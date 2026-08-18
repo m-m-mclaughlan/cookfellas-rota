@@ -41,6 +41,27 @@ window.applyCleanShiftLabelsPatch = function (html) {
       html = html.replace(exportMarker, exportReplacement);
     }
 
+    // Staff printouts should not show the manager marker. This only changes
+    // the generated staff-facing HTML; manager status in the rota app is untouched.
+    const printManagerMarker = '${Ie(e.name)}${e.isManager?" (MGR)":""}';
+    const printManagerReplacement = '${Ie(e.name)}';
+    if (html.includes(printManagerMarker)) {
+      html = html.replace(printManagerMarker, printManagerReplacement);
+    } else {
+      console.warn('Print manager-label marker not found.');
+    }
+
+    // Keep Restaurant printouts easy to scan by putting anybody assigned a
+    // POTS duty after the normal Restaurant staff rows. Bar printouts contain
+    // no pots-role slots, so their existing order is preserved.
+    const printRowsMarker = '<tbody>${e.map(a=>Zt(a,t,n)).join("")}</tbody>';
+    const printRowsReplacement = '<tbody>${e.slice().sort((a,l)=>{let c=t.some(h=>h.role==="pots"&&n[h.id]===a.id),y=t.some(h=>h.role==="pots"&&n[h.id]===l.id);return Number(c)-Number(y)}).map(a=>Zt(a,t,n)).join("")}</tbody>';
+    if (html.includes(printRowsMarker)) {
+      html = html.replace(printRowsMarker, printRowsReplacement);
+    } else {
+      console.warn('Print row-order marker not found.');
+    }
+
     return html;
   } catch (error) {
     console.error('Clean shift labels patch skipped:', error);
