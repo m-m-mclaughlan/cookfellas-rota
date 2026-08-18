@@ -1,10 +1,16 @@
 window.applyCleanShiftLabelsPatch = function (html) {
   try {
+    // Keep the staff-facing terminology neutral. This only changes visible
+    // labels; the underlying scheduling behaviour is untouched.
+    html = html.split('"Aligned days off"').join('"Rota preferences"');
+    html = html.split('"Work-life balance"').join('"Rota preferences"');
+    html = html.split('"Work life balance"').join('"Rota preferences"');
+
     // Remove the redundant visible "(closedown)" suffix from all built-in
     // template/optimizer literals. isClose remains the source of truth.
     html = html.split(' (closedown)').join('');
 
-    // Any shift created from a template (standard, WLB or saved) is normalised.
+    // Any shift created from a template (standard, rota-preference or saved) is normalised.
     const eeMarker = 'ee=s=>(s||[]).map(g=>({id:oe(),isOpen:!1,isClose:!1,...g}))';
     const eeReplacement = 'ee=s=>(s||[]).map(g=>({id:oe(),isOpen:!1,isClose:!1,...g,time:String(g&&g.time||"").replace(/\\s*\\(closedown\\)\\s*/gi,"").trim()}))';
     if (html.includes(eeMarker)) {
