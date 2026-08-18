@@ -15,7 +15,7 @@
     <div>
       <div class="eyebrow">Cookfella's Bar &amp; Eatery · V2</div>
       <div class="title">Smart Rota</div>
-      <div class="sub">Core rebuild. Coverage, skills, manager opening/closing cover, roster availability, consecutive days off, whole-shift pots duties, shift-length limits and balanced contracted-hour targets are active. Saturday pots is split between two people.</div>
+      <div class="sub">Core rebuild. Coverage, skills, manager opening/closing cover, roster availability, rota preferences, whole-shift pots duties and balanced contracted-hour targets are active. Saturday pots is split between two people.</div>
     </div>
     <div class="actions">
       <button class="btn" id="importLegacy">Import current V2 roster</button>
@@ -42,7 +42,7 @@
 
     <section class="panel">
       <h2>Staff roster</h2>
-      <p class="hint"><strong>Active now:</strong> skill level, manager status, contract type/hours, availability, whole-shift pots duties, 8.5h preferred / 10h hard shift-length limits and a mandatory pair of consecutive days off. Fran &amp; Tyler are hard-linked to the same two days off. Sunday + Monday counts as a consecutive pair. <strong>Stored but inactive:</strong> Bar preference, preferred minimum shift, max workdays and wanted days.</p>
+      <p class="hint"><strong>Active now:</strong> skill level, manager status, contract type/hours, availability and whole-shift pots duties. <strong>Rota preferences:</strong> 8.5h preferred / 10h hard shift-length limits and a mandatory pair of consecutive days off. Fran &amp; Tyler are hard-linked to the same two days off. Sunday + Monday counts as a consecutive pair. <strong>Stored but inactive:</strong> Bar preference, preferred minimum shift, max workdays and wanted days.</p>
       <div class="actions" style="margin-bottom:9px"><button class="btn small" id="addStaff">+ Staff</button><span class="badge" id="staffSource"></span></div>
       <div class="staffList" id="staffList"></div>
     </section>
@@ -54,7 +54,7 @@
     <div class="metrics" id="metrics"></div>
     <div id="warnings"></div>
     <div class="rotaGrid" id="rotaGrid"></div>
-    <div class="footerNote">V2 Core 0.11 keeps coverage, skills, roster availability, manager opening/closing cover, consecutive days off and whole-shift pots duties hard. Saturday has separate 11–5 and 5–close pots duties worked by different people. Shift length now targets a maximum of 8.5 hours per day/continuous run, with an absolute 10 hour ceiling so open-to-close 11+ hour shifts cannot be generated. Exported Restaurant rotas continue to label POTS and RUNNING duties. Minimum-shift, workday-count, split-gap and Bar-preference rules remain inactive.</div>
+    <div class="footerNote">V2 Core 0.11 keeps coverage, skills, roster availability, manager opening/closing cover, consecutive days off and whole-shift pots duties hard. Saturday has separate 11–5 and 5–close pots duties worked by different people. Rota preferences target a maximum of 8.5 hours per day/continuous run, with an absolute 10 hour ceiling so open-to-close 11+ hour shifts cannot be generated. Exported Restaurant rotas continue to label POTS and RUNNING duties. Minimum-shift, workday-count, split-gap and Bar-preference rules remain inactive.</div>
   </section>
 </div>
 <div class="build">V2 · Core 0.11</div>
